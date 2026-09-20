@@ -1580,6 +1580,8 @@ function renderAdminView() {
     case 'dashboard': return adminDashboard();
     case 'admin-businesses': return adminBusinesses();
     case 'admin-business-detail': return adminBusinessDetail(state.params.id);
+    case 'admin-business-new': return adminBusinessNew();
+    case 'admin-agent-new': return adminAgentNew();
     case 'admin-customers': return adminCustomers();
     case 'admin-products': return adminProducts();
     case 'admin-orders': return adminOrders();
@@ -1645,7 +1647,9 @@ function adminBusinesses() {
   let list = DB.businesses;
   if (filterStatus !== 'all') list = list.filter((b) => b.status === filterStatus);
   return `
-    <div class="page-head"><h1>Businesses</h1></div>
+    <div class="page-head"><h1>Businesses</h1>
+      <button class="btn btn-primary btn-sm" data-action="nav" data-view="admin-business-new">${ICONS.plus} Create business</button>
+    </div>
     <div class="tab-bar">
       ${['all', 'pending', 'active', 'suspended', 'rejected'].map((s) => `<button class="${filterStatus === s ? 'active' : ''}" data-action="admin-biz-filter" data-status="${s}">${s === 'all' ? 'All' : s[0].toUpperCase() + s.slice(1)}</button>`).join('')}
     </div>
@@ -1797,7 +1801,9 @@ function adminAgents() {
   let list = DB.agents;
   if (filterStatus !== 'all') list = list.filter((a) => a.status === filterStatus);
   return `
-    <div class="page-head"><h1>Delivery agents</h1></div>
+    <div class="page-head"><h1>Delivery agents</h1>
+      <button class="btn btn-primary btn-sm" data-action="nav" data-view="admin-agent-new">${ICONS.plus} Create agent</button>
+    </div>
     <div class="tab-bar">
       ${['all', 'online', 'delivering', 'offline'].map((s) => `<button class="${filterStatus === s ? 'active' : ''}" data-action="admin-agents-filter" data-status="${s}">${s[0].toUpperCase() + s.slice(1)}</button>`).join('')}
     </div>
@@ -1931,6 +1937,75 @@ function adminSettingsView() {
       <div class="form-group mb-0"><label>Support phone number</label><input type="text" value="" /></div>
     </div>
     <button class="btn btn-primary btn-block mt-16" data-action="toast-success" data-msg="Platform settings saved">Save settings</button>
+  `;
+}
+
+function adminBusinessNew() {
+  return `
+    ${backBtn('Businesses')}
+    <div class="page-head"><h1>Create business</h1><div class="sub">Creates a business account and a user login</div></div>
+    <div class="card">
+      <strong style="font-size:13px;">Business details</strong>
+      <div class="form-group mt-12"><label>Business name</label><input type="text" id="cb-bizName" placeholder="e.g. Shehu Poultry Farm" /></div>
+      <div class="form-row">
+        <div class="form-group"><label>Owner name</label><input type="text" id="cb-ownerName" placeholder="e.g. Shehu Yusuf" /></div>
+        <div class="form-group"><label>Category</label>
+          <select id="cb-category">${CATEGORIES.map((c) => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Phone</label><input type="tel" id="cb-phone" placeholder="080..." /></div>
+        <div class="form-group"><label>Address</label><input type="text" id="cb-address" placeholder="e.g. Sabon Gari, Kano" /></div>
+      </div>
+    </div>
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Login credentials</strong>
+      <p class="text-sm text-muted mt-8">Share these with the business owner. They log in at this same page.</p>
+      <div class="form-row">
+        <div class="form-group"><label>Email</label><input type="email" id="cb-email" placeholder="owner@example.com" /></div>
+        <div class="form-group"><label>Password (min 6 chars)</label><input type="text" id="cb-password" placeholder="e.g. shehu-2026" /></div>
+      </div>
+      <div class="auth-error" id="cb-error" style="margin:6px 0 0;"></div>
+    </div>
+    <div class="sticky-bottom-bar">
+      <button class="btn btn-outline btn-block" data-action="back">Cancel</button>
+      <button class="btn btn-primary btn-block" data-action="admin-create-business">Create business</button>
+    </div>
+  `;
+}
+
+function adminAgentNew() {
+  return `
+    ${backBtn('Delivery agents')}
+    <div class="page-head"><h1>Create delivery agent</h1><div class="sub">Creates an agent account and a user login</div></div>
+    <div class="card">
+      <strong style="font-size:13px;">Agent details</strong>
+      <div class="form-row mt-12">
+        <div class="form-group"><label>Full name</label><input type="text" id="ca-name" placeholder="e.g. Musa Ibrahim" /></div>
+        <div class="form-group"><label>Phone</label><input type="tel" id="ca-phone" placeholder="080..." /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Vehicle</label>
+          <select id="ca-vehicle">
+            <option>Motorcycle</option><option>Bicycle</option><option>Tricycle (Keke)</option><option>Van</option><option>Car</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Operating area</label><input type="text" id="ca-area" placeholder="e.g. Sabon Gari, Kano" /></div>
+      </div>
+    </div>
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Login credentials</strong>
+      <p class="text-sm text-muted mt-8">Share these with the agent.</p>
+      <div class="form-row">
+        <div class="form-group"><label>Email</label><input type="email" id="ca-email" placeholder="agent@example.com" /></div>
+        <div class="form-group"><label>Password (min 6 chars)</label><input type="text" id="ca-password" placeholder="e.g. musa-2026" /></div>
+      </div>
+      <div class="auth-error" id="ca-error" style="margin:6px 0 0;"></div>
+    </div>
+    <div class="sticky-bottom-bar">
+      <button class="btn btn-outline btn-block" data-action="back">Cancel</button>
+      <button class="btn btn-primary btn-block" data-action="admin-create-agent">Create agent</button>
+    </div>
   `;
 }
 
@@ -2073,6 +2148,45 @@ function handleAction(el, ev) {
       break;
     }
     case 'admin-agents-filter': navigate('admin-agents', { status: el.dataset.status }); break;
+    case 'admin-create-business': {
+      const A = window.PXDynastyAuth;
+      if (!A || !A.createBusinessAccount) { toast('Auth module not loaded', 'error'); break; }
+      const res = A.createBusinessAccount({
+        businessName: (document.getElementById('cb-bizName') || {}).value || '',
+        ownerName:    (document.getElementById('cb-ownerName') || {}).value || '',
+        category:     (document.getElementById('cb-category') || {}).value || 'groceries',
+        phone:        (document.getElementById('cb-phone') || {}).value || '',
+        address:      (document.getElementById('cb-address') || {}).value || '',
+        email:        (document.getElementById('cb-email') || {}).value || '',
+        password:     (document.getElementById('cb-password') || {}).value || '',
+      });
+      if (!res.ok) {
+        const errEl = document.getElementById('cb-error'); if (errEl) errEl.textContent = res.error;
+        toast(res.error, 'error'); break;
+      }
+      toast('Business created: ' + res.business.name, 'success');
+      navigate('admin-businesses');
+      break;
+    }
+    case 'admin-create-agent': {
+      const A = window.PXDynastyAuth;
+      if (!A || !A.createAgentAccount) { toast('Auth module not loaded', 'error'); break; }
+      const res = A.createAgentAccount({
+        name:    (document.getElementById('ca-name') || {}).value || '',
+        phone:   (document.getElementById('ca-phone') || {}).value || '',
+        vehicle: (document.getElementById('ca-vehicle') || {}).value || 'Motorcycle',
+        operatingArea: (document.getElementById('ca-area') || {}).value || '',
+        email:    (document.getElementById('ca-email') || {}).value || '',
+        password: (document.getElementById('ca-password') || {}).value || '',
+      });
+      if (!res.ok) {
+        const errEl = document.getElementById('ca-error'); if (errEl) errEl.textContent = res.error;
+        toast(res.error, 'error'); break;
+      }
+      toast('Agent created: ' + res.agent.name, 'success');
+      navigate('admin-agents');
+      break;
+    }
     case 'admin-process-settlement': { createSettlement(el.dataset.id); render(); toast('Settlement processed', 'success'); break; }
 
     case 'toast-info': toast(el.dataset.msg, 'info'); break;

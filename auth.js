@@ -1,25 +1,23 @@
 /* ==========================================================================
    PXDynasty — auth.js
-   Landing page + login/signup + session + role routing.
+   Landing page + login/signup + session + role routing + admin provisioning.
    localStorage-only (prototype). Swappable for Supabase later.
    ========================================================================== */
 
 const AUTH_STORAGE_KEY = 'PXDynasty_auth_v1';
 const USERS_STORAGE_KEY = 'PXDynasty_users_v1';
 
-/* --------------------------------------------------------------------------
-   Hard-coded admin credentials.
-   Change these before sharing the app with anyone.
-   -------------------------------------------------------------------------- */
 const ADMIN_CREDENTIALS = {
   email: 'admin@pxdynasty.local',
   password: 'px-admin-2026',
   name: 'Platform Admin',
 };
 
-/* --------------------------------------------------------------------------
-   Storage helpers
-   -------------------------------------------------------------------------- */
+/* Reach app.js's top-level consts (DB, state) safely. */
+function authAppDb()   { try { return DB; }    catch (e) { return null; } }
+function authAppState(){ try { return state; } catch (e) { return null; } }
+
+/* ---------- storage ---------- */
 
 function authLoadUsers() {
   try { return JSON.parse(localStorage.getItem(USERS_STORAGE_KEY)) || []; }
@@ -37,7 +35,6 @@ function authSaveSession(session) {
   else localStorage.removeItem(AUTH_STORAGE_KEY);
 }
 
-/* Ensure the admin user always exists in the users list. */
 function authEnsureAdmin() {
   const users = authLoadUsers();
   const found = users.find((u) => u.email === ADMIN_CREDENTIALS.email);
@@ -49,15 +46,12 @@ function authEnsureAdmin() {
       name: ADMIN_CREDENTIALS.name,
       role: 'admin',
       createdAt: new Date().toISOString(),
-      isAdmin: true,
     });
     authSaveUsers(users);
   }
 }
 
-/* --------------------------------------------------------------------------
-   Auth actions
-   -------------------------------------------------------------------------- */
+/* ---------- auth actions ---------- */
 
 function authSignup(email, password, name) {
   email = String(email || '').trim().toLowerCase();
@@ -73,17 +67,13 @@ function authSignup(email, password, name) {
 
   const user = {
     id: 'u-' + Math.random().toString(36).slice(2, 10),
-    email,
-    password,
-    name,
+    email, password, name,
     role: 'customer',
     createdAt: new Date().toISOString(),
   };
-  users.push(user);
-  authSaveUsers(users);
 
-  // Also create a matching customer record in the DB.
-  if (window.DB) {
+  const db = authAppDb();
+  if (db) {
     const cust = {
       id: 'cust-' + user.id,
       name: user.name,
@@ -92,11 +82,13 @@ function authSignup(email, password, name) {
       addresses: [],
       paymentMethods: [],
     };
-    DB.customers.push(cust);
-    saveData(DB);
+    db.customers.push(cust);
+    saveData(db);
     user.customerId = cust.id;
   }
 
+  users.push(user);
+  authSaveUsers(users);
   authSaveSession({ userId: user.id, role: user.role, at: Date.now() });
   return { ok: true, user };
 }
@@ -106,7 +98,6 @@ function authLogin(email, password) {
   password = String(password || '');
   if (!email || !password) return { ok: false, error: 'Enter your email and password.' };
 
-  // Admin check first (hardcoded credentials).
   if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
     authEnsureAdmin();
     const users = authLoadUsers();
@@ -118,19 +109,17 @@ function authLogin(email, password) {
   const users = authLoadUsers();
   const user = users.find((u) => u.email === email && u.password === password);
   if (!user) return { ok: false, error: 'Invalid email or password.' };
-
   authSaveSession({ userId: user.id, role: user.role, at: Date.now() });
   return { ok: true, user };
 }
 
 function authLogout() {
   authSaveSession(null);
-  try {
-    if (typeof state !== 'undefined') {
-      state.role = 'customer';
-      state.view = 'home';
-    }
-  } catch (e) {}
+  const appState = authAppState();
+  if (appState) {
+    appState.role = 'customer';
+    appState.view = 'home';
+  }
   renderAuthGate();
 }
 
@@ -141,19 +130,12 @@ function authCurrentUser() {
   return users.find((u) => u.id === session.userId) || null;
 }
 
-function authIsLoggedIn() {
-  return !!authCurrentUser();
-}
+function authIsLoggedIn() { return !!authCurrentUser(); }
 
-/* After a real user logs in, wire them into the app's role state. */
 function authApplySessionToApp() {
   const user = authCurrentUser();
   if (!user) return false;
-  // app.js declares `state` as a top-level const, which is NOT on window.
-  // It IS accessible as a global binding to scripts loaded after app.js,
-  // and by the time this runs app.js has executed, so we can use it directly.
-  let appState;
-  try { appState = state; } catch (e) { appState = null; }
+  const appState = authAppState();
   if (!appState) return false;
 
   if (user.role === 'admin') {
@@ -176,9 +158,109 @@ function authApplySessionToApp() {
   return true;
 }
 
-/* --------------------------------------------------------------------------
-   Landing page (marketing)
-   -------------------------------------------------------------------------- */
+/* ---------- admin provisioning ---------- */
+
+function authCreateBusinessAccount(opts) {
+  opts = opts || {};
+  const email = String(opts.email || '').trim().toLowerCase();
+  const password = String(opts.password || '');
+  const ownerName = String(opts.ownerName || '').trim();
+  const businessName = String(opts.businessName || '').trim();
+  const category = opts.category || 'groceries';
+  const phone = String(opts.phone || '').trim();
+  const address = String(opts.address || '').trim();
+
+  if (!email || !email.includes('@')) return { ok: false, error: 'Enter a valid email.' };
+  if (password.length < 6) return { ok: false, error: 'Password must be at least 6 characters.' };
+  if (!businessName) return { ok: false, error: 'Enter the business name.' };
+
+  const users = authLoadUsers();
+  if (users.some((u) => u.email === email)) {
+    return { ok: false, error: 'An account with that email already exists.' };
+  }
+
+  const bizId = 'biz-' + Math.random().toString(36).slice(2, 9);
+  const bizRecord = {
+    id: bizId,
+    name: businessName,
+    category,
+    ownerName: ownerName || businessName,
+    phone,
+    email,
+    address,
+    rating: '—',
+    verified: true,
+    status: 'active',
+    deliveryEstimate: 30,
+    hue: Math.floor(Math.random() * 360),
+    open: true,
+    createdAt: new Date().toISOString(),
+  };
+  const db = authAppDb();
+  if (db) { db.businesses.push(bizRecord); saveData(db); }
+
+  const user = {
+    id: 'u-' + Math.random().toString(36).slice(2, 10),
+    email, password,
+    name: ownerName || businessName,
+    role: 'business',
+    businessId: bizId,
+    createdAt: new Date().toISOString(),
+  };
+  users.push(user);
+  authSaveUsers(users);
+
+  return { ok: true, user, business: bizRecord };
+}
+
+function authCreateAgentAccount(opts) {
+  opts = opts || {};
+  const email = String(opts.email || '').trim().toLowerCase();
+  const password = String(opts.password || '');
+  const name = String(opts.name || '').trim();
+  const phone = String(opts.phone || '').trim();
+  const vehicle = opts.vehicle || 'Motorcycle';
+  const operatingArea = String(opts.operatingArea || '').trim();
+
+  if (!email || !email.includes('@')) return { ok: false, error: 'Enter a valid email.' };
+  if (password.length < 6) return { ok: false, error: 'Password must be at least 6 characters.' };
+  if (!name) return { ok: false, error: 'Enter the agent name.' };
+
+  const users = authLoadUsers();
+  if (users.some((u) => u.email === email)) {
+    return { ok: false, error: 'An account with that email already exists.' };
+  }
+
+  const agentId = 'agent-' + Math.random().toString(36).slice(2, 9);
+  const agentRecord = {
+    id: agentId,
+    name, phone, vehicle,
+    status: 'offline',
+    verified: true,
+    rating: '—',
+    operatingArea,
+    completedDeliveries: 0,
+    earningsToday: 0, earningsWeek: 0, earningsPending: 0, earningsPaid: 0,
+    createdAt: new Date().toISOString(),
+  };
+  const db = authAppDb();
+  if (db) { db.agents.push(agentRecord); saveData(db); }
+
+  const user = {
+    id: 'u-' + Math.random().toString(36).slice(2, 10),
+    email, password,
+    name,
+    role: 'agent',
+    agentId,
+    createdAt: new Date().toISOString(),
+  };
+  users.push(user);
+  authSaveUsers(users);
+
+  return { ok: true, user, agent: agentRecord };
+}
+
+/* ---------- landing page ---------- */
 
 function renderLandingPage() {
   return `
@@ -213,7 +295,6 @@ function renderLandingPage() {
             <div class="auth-meta-item"><strong>Simple</strong><span>Pay once, we handle the rest</span></div>
           </div>
         </div>
-
       </div>
 
       <div class="auth-right">
@@ -318,9 +399,7 @@ function renderAuthPanel(mode) {
   `;
 }
 
-/* --------------------------------------------------------------------------
-   Auth gate — decides what to render at the top level
-   -------------------------------------------------------------------------- */
+/* ---------- auth gate ---------- */
 
 function renderAuthGate() {
   const appEl = document.getElementById('app');
@@ -329,7 +408,6 @@ function renderAuthGate() {
 
   if (authIsLoggedIn()) {
     appEl.classList.remove('auth-mode');
-    // Always rebuild the shell so we start from a known state.
     appEl.innerHTML = `
       <div id="header-root"></div>
       <div class="app-body">
@@ -349,21 +427,17 @@ function renderAuthGate() {
   if (modalEl) { modalEl.classList.remove('open'); modalEl.innerHTML = ''; }
 }
 
-/* --------------------------------------------------------------------------
-   Event wiring for auth actions
-   -------------------------------------------------------------------------- */
+/* ---------- event wiring ---------- */
 
 function authShowPanel(mode) {
   const panel = document.getElementById('auth-panel');
   if (!panel) return;
   panel.innerHTML = renderAuthPanel(mode);
 }
-
 function authShowError(msg) {
   const el = document.getElementById('au-error');
   if (el) el.textContent = msg || '';
 }
-
 function authReadForm() {
   return {
     name: (document.getElementById('au-name') || {}).value || '',
@@ -392,13 +466,9 @@ document.addEventListener('click', (e) => {
     renderAuthGate();
     return;
   }
-  if (action === 'logout') {
-    authLogout();
-    return;
-  }
+  if (action === 'logout') { authLogout(); return; }
 });
 
-/* Support Enter key inside auth form fields. */
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   const t = e.target;
@@ -411,9 +481,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-/* --------------------------------------------------------------------------
-   Expose helpers for app.js
-   -------------------------------------------------------------------------- */
+/* ---------- expose ---------- */
 
 window.PXDynastyAuth = {
   currentUser: authCurrentUser,
@@ -421,4 +489,6 @@ window.PXDynastyAuth = {
   logout: authLogout,
   applySessionToApp: authApplySessionToApp,
   renderAuthGate,
+  createBusinessAccount: authCreateBusinessAccount,
+  createAgentAccount: authCreateAgentAccount,
 };
