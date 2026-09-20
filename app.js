@@ -395,6 +395,11 @@ function navigate(view, params) {
   render();
 }
 function switchRole(role) {
+  const user = window.PXDynastyAuth && window.PXDynastyAuth.currentUser && window.PXDynastyAuth.currentUser();
+  if (!user || user.role !== 'admin') {
+    if (window.PXDynastyAuth && window.PXDynastyAuth.logout) window.PXDynastyAuth.logout();
+    return;
+  }
   state.role = role;
   const defaults = { customer: 'home', business: 'overview', agent: 'jobs', admin: 'dashboard' };
   navigate(defaults[role]);
@@ -426,11 +431,6 @@ function renderHeader() {
   }
   actions += `<button class="icon-btn" data-action="nav-notifications" title="Notifications">${ICONS.bell2}${unread ? `<span class="badge-dot">${unread}</span>` : ''}</button>`;
 
-  const roleMenuItems = ['customer', 'business', 'agent', 'admin'].map((r) => `
-    <button class="role-menu-item ${r === state.role ? 'active' : ''}" data-action="switch-role" data-role="${r}">
-      <span class="dot"></span> ${ROLE_LABEL[r]}
-    </button>`).join('');
-
   return `
     <header class="app-header">
       <div class="brand" data-action="nav-home">
@@ -451,8 +451,10 @@ function renderHeader() {
             <span>${ROLE_LABEL[state.role]}</span>
           </button>
           <div class="role-menu" id="role-menu">
-            <div class="role-menu-label">Switch role</div>
-            ${roleMenuItems}
+            <div class="role-menu-label">Signed in as ${escapeHtml(roleSubtitle())}</div>
+            <button class="role-menu-item" data-auth="logout">
+              <span class="dot" style="background:var(--color-error);"></span> Log out
+            </button>
           </div>
         </div>
       </div>
@@ -2200,4 +2202,12 @@ document.addEventListener('keydown', (e) => {
    15. INIT
    ========================================================================== */
 
-render();
+function boot() {
+  if (window.PXDynastyAuth && typeof window.PXDynastyAuth.renderAuthGate === 'function') {
+    window.PXDynastyAuth.renderAuthGate();
+  } else {
+    render();
+  }
+}
+
+boot();
