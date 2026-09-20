@@ -447,9 +447,10 @@ function navigate(view, params) {
   render();
 }
 function switchRole(role) {
-  const user = window.PXDynastyAuth && window.PXDynastyAuth.currentUser && window.PXDynastyAuth.currentUser();
+  const A = window.PXDynastyAuth;
+  const user = A && A.currentUserSync ? A.currentUserSync() : null;
   if (!user || user.role !== 'admin') {
-    if (window.PXDynastyAuth && window.PXDynastyAuth.logout) window.PXDynastyAuth.logout();
+    if (A && A.logout) A.logout();
     return;
   }
   state.role = role;
@@ -2435,7 +2436,6 @@ document.addEventListener('keydown', (e) => {
    ========================================================================== */
 
 async function boot() {
-  // Try to pull the shared state from Supabase before rendering anything.
   try {
     const ok = await hydrateDb();
     console.log('hydrateDb:', ok ? 'loaded from Supabase' : 'using local cache');
@@ -2444,7 +2444,7 @@ async function boot() {
   }
 
   if (window.PXDynastyAuth && typeof window.PXDynastyAuth.renderAuthGate === 'function') {
-    window.PXDynastyAuth.renderAuthGate();
+    await window.PXDynastyAuth.renderAuthGate();
   } else {
     render();
   }
