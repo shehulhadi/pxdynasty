@@ -125,10 +125,12 @@ function authLogin(email, password) {
 
 function authLogout() {
   authSaveSession(null);
-  if (window.state) {
-    state.role = 'customer';
-    state.view = 'home';
-  }
+  try {
+    if (typeof state !== 'undefined') {
+      state.role = 'customer';
+      state.view = 'home';
+    }
+  } catch (e) {}
   renderAuthGate();
 }
 
@@ -147,24 +149,29 @@ function authIsLoggedIn() {
 function authApplySessionToApp() {
   const user = authCurrentUser();
   if (!user) return false;
-  if (!window.state) return false;
+  // app.js declares `state` as a top-level const, which is NOT on window.
+  // It IS accessible as a global binding to scripts loaded after app.js,
+  // and by the time this runs app.js has executed, so we can use it directly.
+  let appState;
+  try { appState = state; } catch (e) { appState = null; }
+  if (!appState) return false;
 
   if (user.role === 'admin') {
-    state.role = 'admin';
-    state.view = 'dashboard';
-    state.currentAdminId = user.id;
+    appState.role = 'admin';
+    appState.view = 'dashboard';
+    appState.currentAdminId = user.id;
   } else if (user.role === 'business') {
-    state.role = 'business';
-    state.view = 'overview';
-    state.currentBusinessId = user.businessId || null;
+    appState.role = 'business';
+    appState.view = 'overview';
+    appState.currentBusinessId = user.businessId || null;
   } else if (user.role === 'agent') {
-    state.role = 'agent';
-    state.view = 'jobs';
-    state.currentAgentId = user.agentId || null;
+    appState.role = 'agent';
+    appState.view = 'jobs';
+    appState.currentAgentId = user.agentId || null;
   } else {
-    state.role = 'customer';
-    state.view = 'home';
-    state.currentCustomerId = user.customerId || null;
+    appState.role = 'customer';
+    appState.view = 'home';
+    appState.currentCustomerId = user.customerId || null;
   }
   return true;
 }
@@ -268,17 +275,15 @@ function renderAuthGate() {
 
   if (authIsLoggedIn()) {
     appEl.classList.remove('auth-mode');
-    // Restore the header/nav/sidebar/main containers.
-    if (!document.getElementById('header-root')) {
-      appEl.innerHTML = `
-        <div id="header-root"></div>
-        <div class="app-body">
-          <div id="sidebar-root"></div>
-          <main class="main-scroll" id="main-scroll"></main>
-        </div>
-        <div id="bottomnav-root"></div>
-      `;
-    }
+    // Always rebuild the shell so we start from a known state.
+    appEl.innerHTML = `
+      <div id="header-root"></div>
+      <div class="app-body">
+        <div id="sidebar-root"></div>
+        <main class="main-scroll" id="main-scroll"></main>
+      </div>
+      <div id="bottomnav-root"></div>
+    `;
     authApplySessionToApp();
     if (typeof render === 'function') render();
     return;
