@@ -214,29 +214,6 @@ function renderLandingPage() {
           </div>
         </div>
 
-        <div class="auth-floaters" aria-hidden="true">
-          <div class="floater floater-1">
-            <div class="floater-icon">🧺</div>
-            <div class="floater-meta">
-              <span class="floater-name">Fresh produce</span>
-              <span class="floater-price">₦4,500</span>
-            </div>
-          </div>
-          <div class="floater floater-2">
-            <div class="floater-icon">🍗</div>
-            <div class="floater-meta">
-              <span class="floater-name">Poultry today</span>
-              <span class="floater-price">₦8,200</span>
-            </div>
-          </div>
-          <div class="floater floater-3">
-            <div class="floater-icon">🛵</div>
-            <div class="floater-meta">
-              <span class="floater-name">Delivery in</span>
-              <span class="floater-price">24 min</span>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div class="auth-right">
