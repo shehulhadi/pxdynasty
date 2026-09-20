@@ -1628,6 +1628,60 @@ function adminDashboard() {
       <div class="row-card flex items-center justify-between"><span class="text-sm">Pending business approvals</span><span class="status-badge status-warn">${getBusinesses({ status: 'pending' }).length}</span></div>
       <div class="row-card flex items-center justify-between"><span class="text-sm">Pending settlements</span><span class="status-badge status-warn">${pendingSettlements}</span></div>
     </div>
+
+    <div class="section-title-row"><h2>Quick actions</h2></div>
+    <div class="row-cards">
+      <div class="row-card pressable" style="cursor:pointer;" data-action="nav" data-view="admin-business-new">
+        <div class="flex items-center gap-10">
+          <div class="logo-sq" style="width:40px;height:40px;font-size:14px;">${ICONS.store}</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:14px;">Create a business</div>
+            <div class="text-sm text-muted">Provision a new seller account with login</div>
+          </div>
+          ${ICONS.chevronRight}
+        </div>
+      </div>
+      <div class="row-card pressable" style="cursor:pointer;" data-action="nav" data-view="admin-agent-new">
+        <div class="flex items-center gap-10">
+          <div class="logo-sq" style="width:40px;height:40px;font-size:14px;">${ICONS.bike}</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:14px;">Create a delivery agent</div>
+            <div class="text-sm text-muted">Provision a new rider account with login</div>
+          </div>
+          ${ICONS.chevronRight}
+        </div>
+      </div>
+      <div class="row-card pressable" style="cursor:pointer;" data-action="nav" data-view="admin-businesses">
+        <div class="flex items-center gap-10">
+          <div class="logo-sq" style="width:40px;height:40px;font-size:14px;">${ICONS.users}</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:14px;">All businesses</div>
+            <div class="text-sm text-muted">View, approve, suspend</div>
+          </div>
+          ${ICONS.chevronRight}
+        </div>
+      </div>
+      <div class="row-card pressable" style="cursor:pointer;" data-action="nav" data-view="admin-orders">
+        <div class="flex items-center gap-10">
+          <div class="logo-sq" style="width:40px;height:40px;font-size:14px;">${ICONS.orders}</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:14px;">All orders</div>
+            <div class="text-sm text-muted">Track and manage every order</div>
+          </div>
+          ${ICONS.chevronRight}
+        </div>
+      </div>
+      <div class="row-card pressable" style="cursor:pointer;" data-action="nav" data-view="admin-agents">
+        <div class="flex items-center gap-10">
+          <div class="logo-sq" style="width:40px;height:40px;font-size:14px;">${ICONS.bike}</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:14px;">All delivery agents</div>
+            <div class="text-sm text-muted">Manage your fleet</div>
+          </div>
+          ${ICONS.chevronRight}
+        </div>
+      </div>
+    </div>
   `;
 }
 
