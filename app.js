@@ -103,11 +103,7 @@ function defaultSettings() {
 
 const DB_KEY = 'PXDynasty_db_v1';
 
-function loadData() {
-  const raw = localStorage.getItem(DB_KEY);
-  if (raw) {
-    try { return JSON.parse(raw); } catch (e) { /* fall through to empty */ }
-  }
+function emptyDb() {
   return {
     settings: defaultSettings(),
     businesses: [],
@@ -121,8 +117,64 @@ function loadData() {
   };
 }
 
+/* Local cache copy — used as a fallback if Supabase is unreachable. */
+function loadDataLocal() {
+  const raw = localStorage.getItem(DB_KEY);
+  if (raw) {
+    try { return Object.assign(emptyDb(), JSON.parse(raw)); } catch (e) { /* fall through */ }
+  }
+  return emptyDb();
+}
+
+/* Sync version used at module load: returns local cache so DB is never null.
+   The async cloud fetch happens later and calls hydrateDb(). */
+function loadData() {
+  return loadDataLocal();
+}
+
+/* Async: replace DB's contents with the cloud copy. */
+async function hydrateDb() {
+  if (!window.PXDynastySBC) return false;
+  const remote = await window.PXDynastySBC.fetchAll();
+  if (!remote) return false;
+  DB.businesses = remote.businesses;
+  DB.products = remote.products;
+  DB.orders = remote.orders;
+  DB.customers = remote.customers;
+  DB.agents = remote.agents;
+  // Mirror into local cache too.
+  saveDataLocalOnly();
+  return true;
+}
+
+/* Save to local cache AND push to Supabase. Fire-and-forget cloud writes. */
 function saveData(db) {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  saveDataLocalOnly();
+  cloudSyncAll();
+}
+
+function saveDataLocalOnly() {
+  localStorage.setItem(DB_KEY, JSON.stringify(DB));
+}
+
+/* Push every record currently in DB back to Supabase (upserts).
+   Idempotent: safe to call repeatedly. */
+let _cloudSyncBusy = false;
+async function cloudSyncAll() {
+  if (!window.PXDynastySBC) return;
+  if (_cloudSyncBusy) return;
+  _cloudSyncBusy = true;
+  try {
+    const jobs = [];
+    DB.businesses.forEach((b) => jobs.push(window.PXDynastySBC.upsertBusiness(b)));
+    DB.products.forEach((p) => jobs.push(window.PXDynastySBC.upsertProduct(p)));
+    DB.customers.forEach((c) => jobs.push(window.PXDynastySBC.upsertCustomer(c)));
+    DB.agents.forEach((a) => jobs.push(window.PXDynastySBC.upsertAgent(a)));
+    DB.orders.forEach((o) => jobs.push(window.PXDynastySBC.upsertOrder(o)));
+    await Promise.all(jobs);
+  } finally {
+    _cloudSyncBusy = false;
+  }
 }
 
 /* ==========================================================================
@@ -2370,7 +2422,15 @@ document.addEventListener('keydown', (e) => {
    15. INIT
    ========================================================================== */
 
-function boot() {
+async function boot() {
+  // Try to pull the shared state from Supabase before rendering anything.
+  try {
+    const ok = await hydrateDb();
+    console.log('hydrateDb:', ok ? 'loaded from Supabase' : 'using local cache');
+  } catch (e) {
+    console.warn('hydrateDb failed:', e);
+  }
+
   if (window.PXDynastyAuth && typeof window.PXDynastyAuth.renderAuthGate === 'function') {
     window.PXDynastyAuth.renderAuthGate();
   } else {

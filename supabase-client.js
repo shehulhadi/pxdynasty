@@ -1,0 +1,228 @@
+/* ==========================================================================
+   PXDynasty — supabase-client.js
+   Thin wrapper around the Supabase JS SDK.
+   Provides: fetchAll(), and per-table insert/update/delete helpers.
+   The rest of the app still talks to the DB object; this file keeps the
+   DB object in sync with the cloud.
+   ========================================================================== */
+
+const SUPABASE_URL = 'https://ocsglgkombwwpamdijes.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_6HHZQ1MoXmpvi45SD2k9fw_Rj_c3gGB';
+
+let supabaseClient = null;
+
+function sbcInit() {
+  if (typeof window.supabase === 'undefined') {
+    console.warn('Supabase SDK not loaded — running in local-only mode.');
+    return null;
+  }
+  if (!supabaseClient) {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+  return supabaseClient;
+}
+
+/* Map a snake_case row from Supabase to the camelCase shape the app uses. */
+function sbcRowToBiz(r) {
+  return {
+    id: r.id,
+    name: r.name,
+    category: r.category,
+    ownerName: r.owner_name,
+    phone: r.phone,
+    email: r.email,
+    address: r.address,
+    rating: r.rating,
+    verified: r.verified,
+    status: r.status,
+    deliveryEstimate: r.delivery_estimate,
+    hue: r.hue,
+    open: r.open,
+    createdAt: r.created_at,
+  };
+}
+function sbcRowToProduct(r) {
+  return {
+    id: r.id,
+    businessId: r.business_id,
+    name: r.name,
+    category: r.category,
+    description: r.description,
+    sku: r.sku,
+    price: Number(r.price),
+    discountPrice: r.discount_price == null ? null : Number(r.discount_price),
+    stock: r.stock,
+    status: r.status,
+    rating: r.rating,
+    sales: r.sales,
+    hue: r.hue,
+    emoji: r.emoji,
+    createdAt: r.created_at,
+  };
+}
+function sbcRowToOrder(r) {
+  return {
+    id: r.id,
+    orderNumber: r.order_number,
+    customerId: r.customer_id,
+    businessId: r.business_id,
+    items: r.items,
+    subtotal: Number(r.subtotal),
+    deliveryFee: Number(r.delivery_fee),
+    platformFee: Number(r.platform_fee),
+    total: Number(r.total),
+    status: r.status,
+    paymentStatus: r.payment_status,
+    agentId: r.agent_id,
+    deliveryAddress: r.delivery_address,
+    deliveryInstructions: r.delivery_instructions,
+    customerName: r.customer_name,
+    customerPhone: r.customer_phone,
+    paymentMethod: r.payment_method,
+    otp: r.otp,
+    financial: r.financial,
+    statusHistory: r.status_history,
+    settled: r.settled,
+    createdAt: r.created_at,
+  };
+}
+function sbcRowToCustomer(r) {
+  return {
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    phone: r.phone,
+    addresses: r.addresses || [],
+    paymentMethods: r.payment_methods || [],
+    createdAt: r.created_at,
+  };
+}
+function sbcRowToAgent(r) {
+  return {
+    id: r.id,
+    name: r.name,
+    phone: r.phone,
+    vehicle: r.vehicle,
+    status: r.status,
+    verified: r.verified,
+    rating: r.rating,
+    operatingArea: r.operating_area,
+    completedDeliveries: r.completed_deliveries,
+    earningsToday: Number(r.earnings_today || 0),
+    earningsWeek: Number(r.earnings_week || 0),
+    earningsPending: Number(r.earnings_pending || 0),
+    earningsPaid: Number(r.earnings_paid || 0),
+    createdAt: r.created_at,
+  };
+}
+
+/* Convert app objects to snake_case rows for Supabase. */
+function sbcBizToRow(b) {
+  return {
+    id: b.id, name: b.name, category: b.category,
+    owner_name: b.ownerName, phone: b.phone, email: b.email,
+    address: b.address, rating: b.rating, verified: b.verified,
+    status: b.status, delivery_estimate: b.deliveryEstimate,
+    hue: b.hue, open: b.open,
+  };
+}
+function sbcProductToRow(p) {
+  return {
+    id: p.id, business_id: p.businessId, name: p.name,
+    category: p.category, description: p.description, sku: p.sku,
+    price: p.price, discount_price: p.discountPrice, stock: p.stock,
+    status: p.status, rating: p.rating, sales: p.sales,
+    hue: p.hue, emoji: p.emoji,
+  };
+}
+function sbcOrderToRow(o) {
+  return {
+    id: o.id, order_number: o.orderNumber, customer_id: o.customerId,
+    business_id: o.businessId, items: o.items, subtotal: o.subtotal,
+    delivery_fee: o.deliveryFee, platform_fee: o.platformFee, total: o.total,
+    status: o.status, payment_status: o.paymentStatus, agent_id: o.agentId,
+    delivery_address: o.deliveryAddress, delivery_instructions: o.deliveryInstructions,
+    customer_name: o.customerName, customer_phone: o.customerPhone,
+    payment_method: o.paymentMethod, otp: o.otp,
+    financial: o.financial, status_history: o.statusHistory, settled: o.settled,
+  };
+}
+function sbcCustomerToRow(c) {
+  return {
+    id: c.id, name: c.name, email: c.email, phone: c.phone,
+    addresses: c.addresses || [], payment_methods: c.paymentMethods || [],
+  };
+}
+function sbcAgentToRow(a) {
+  return {
+    id: a.id, name: a.name, phone: a.phone, vehicle: a.vehicle,
+    status: a.status, verified: a.verified, rating: a.rating,
+    operating_area: a.operatingArea, completed_deliveries: a.completedDeliveries,
+    earnings_today: a.earningsToday, earnings_week: a.earningsWeek,
+    earnings_pending: a.earningsPending, earnings_paid: a.earningsPaid,
+  };
+}
+
+/* Fetch everything from Supabase. Returns an object shaped like the app DB. */
+async function sbcFetchAll() {
+  const c = sbcInit();
+  if (!c) return null;
+  try {
+    const [bizR, prodR, ordR, custR, agentR] = await Promise.all([
+      c.from('businesses').select('*'),
+      c.from('products').select('*'),
+      c.from('orders').select('*'),
+      c.from('customers').select('*'),
+      c.from('agents').select('*'),
+    ]);
+    if (bizR.error) throw bizR.error;
+    return {
+      businesses: (bizR.data || []).map(sbcRowToBiz),
+      products: (prodR.data || []).map(sbcRowToProduct),
+      orders: (ordR.data || []).map(sbcRowToOrder),
+      customers: (custR.data || []).map(sbcRowToCustomer),
+      agents: (agentR.data || []).map(sbcRowToAgent),
+    };
+  } catch (e) {
+    console.error('sbcFetchAll failed:', e);
+    return null;
+  }
+}
+
+/* Upsert (insert or replace) a single row. Fire-and-forget; log errors. */
+async function sbcUpsert(table, row) {
+  const c = sbcInit();
+  if (!c) return { ok: false, error: 'no client' };
+  try {
+    const { error } = await c.from(table).upsert(row);
+    if (error) { console.error('upsert', table, error); return { ok: false, error: error.message }; }
+    return { ok: true };
+  } catch (e) {
+    console.error('upsert exception', table, e);
+    return { ok: false, error: String(e) };
+  }
+}
+async function sbcDelete(table, id) {
+  const c = sbcInit();
+  if (!c) return { ok: false, error: 'no client' };
+  try {
+    const { error } = await c.from(table).delete().eq('id', id);
+    if (error) { console.error('delete', table, error); return { ok: false, error: error.message }; }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+/* Expose globally for app.js to call. */
+window.PXDynastySBC = {
+  init: sbcInit,
+  fetchAll: sbcFetchAll,
+  upsertBusiness: (b) => sbcUpsert('businesses', sbcBizToRow(b)),
+  upsertProduct:  (p) => sbcUpsert('products', sbcProductToRow(p)),
+  upsertOrder:    (o) => sbcUpsert('orders', sbcOrderToRow(o)),
+  upsertCustomer: (c) => sbcUpsert('customers', sbcCustomerToRow(c)),
+  upsertAgent:    (a) => sbcUpsert('agents', sbcAgentToRow(a)),
+  deleteBusiness: (id) => sbcDelete('businesses', id),
+  deleteProduct:  (id) => sbcDelete('products', id),
+};
