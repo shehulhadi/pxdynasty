@@ -488,3 +488,224 @@ textarea { resize: vertical; min-height: 80px; }
   min-height: 18px;
   margin: 6px 0 10px;
 }
+
+/* ==========================================================================
+   AUTH — interactive landing page (v2)
+   ========================================================================== */
+
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr;
+  position: relative;
+}
+@media (min-width: 960px) {
+  .auth-shell { grid-template-columns: 1.35fr 1fr; }
+}
+
+.auth-hero {
+  position: relative;
+  color: #fff;
+  padding: 42px 26px 60px;
+  background: linear-gradient(155deg, var(--color-primary-dark) 0%, var(--color-primary) 55%, #3F9270 100%);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+@media (min-width: 960px) {
+  .auth-hero { padding: 60px 48px; align-items: center; }
+}
+
+/* Animated gradient blobs */
+.auth-blobs {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.55;
+  will-change: transform;
+}
+.blob-1 {
+  width: 380px; height: 380px;
+  background: radial-gradient(circle, rgba(232,163,61,0.85), transparent 70%);
+  top: -80px; left: -80px;
+  animation: blob-a 18s ease-in-out infinite;
+}
+.blob-2 {
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(255,255,255,0.5), transparent 70%);
+  bottom: -60px; right: -60px;
+  animation: blob-b 22s ease-in-out infinite;
+}
+.blob-3 {
+  width: 260px; height: 260px;
+  background: radial-gradient(circle, rgba(63,146,112,0.7), transparent 70%);
+  top: 40%; left: 55%;
+  animation: blob-c 16s ease-in-out infinite;
+}
+@keyframes blob-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(60px, 40px) scale(1.12); }
+}
+@keyframes blob-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-50px, -30px) scale(1.08); }
+}
+@keyframes blob-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-40px, 50px) scale(0.92); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blob { animation: none; }
+}
+
+.auth-hero-inner {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  animation: hero-fade 0.8s ease-out both;
+}
+@keyframes hero-fade {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.auth-title {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 6vw, 52px);
+  line-height: 1.05;
+  margin: 0 0 18px;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+.auth-title-accent {
+  background: linear-gradient(90deg, #FFE4B8 0%, var(--color-accent) 55%, #C6841F 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Floating product cards */
+.auth-floaters {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.floater {
+  position: absolute;
+  background: rgba(255,255,255,0.95);
+  color: var(--color-text);
+  border-radius: 14px;
+  padding: 10px 14px 10px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 20px 50px -18px rgba(0,0,0,0.45);
+  animation: float-y 6s ease-in-out infinite;
+  backdrop-filter: blur(6px);
+}
+.floater-1 { top: 14%; right: 6%; animation-delay: 0s; }
+.floater-2 { top: 46%; right: 10%; animation-delay: 1.4s; }
+.floater-3 { bottom: 14%; right: 4%; animation-delay: 2.8s; }
+@media (max-width: 960px) {
+  .floater { transform: scale(0.85); }
+  .floater-1 { top: 8%; right: 4%; }
+  .floater-2 { top: 40%; right: 6%; }
+  .floater-3 { bottom: 8%; right: 2%; }
+}
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.floater-icon {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  background: var(--color-primary-tint);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.floater-meta { display: flex; flex-direction: column; line-height: 1.2; }
+.floater-name { font-size: 11px; color: var(--color-text-muted); font-weight: 700; }
+.floater-price { font-size: 13px; font-weight: 800; color: var(--color-text); }
+@media (prefers-reduced-motion: reduce) {
+  .floater { animation: none; }
+}
+
+.auth-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  padding: 40px 22px;
+}
+.auth-right-inner { width: 100%; max-width: 400px; }
+
+/* How it works */
+.landing-how {
+  background: var(--color-surface);
+  padding: 60px 22px;
+  border-top: 1px solid var(--color-border);
+}
+.landing-how-inner { max-width: 960px; margin: 0 auto; }
+.landing-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 4vw, 34px);
+  margin: 6px 0 26px;
+  color: var(--color-text);
+}
+.landing-steps {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+@media (min-width: 720px) { .landing-steps { grid-template-columns: repeat(3, 1fr); } }
+.landing-step {
+  padding: 22px 20px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.landing-step:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary);
+}
+.landing-step-num {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800;
+  margin-bottom: 12px;
+  font-family: var(--font-display);
+}
+.landing-step h3 { font-size: 17px; margin-bottom: 6px; }
+.landing-step p { font-size: 13.5px; color: var(--color-text-muted); margin: 0; line-height: 1.5; }
+
+/* Trust row */
+.landing-trust {
+  background: var(--color-primary-dark);
+  color: #fff;
+  padding: 40px 22px;
+}
+.landing-trust-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 22px;
+}
+@media (min-width: 720px) { .landing-trust-inner { grid-template-columns: repeat(3, 1fr); } }
+.trust-item { display: flex; flex-direction: column; gap: 5px; }
+.trust-item strong { font-family: var(--font-display); font-size: 16px; }
+.trust-item span { font-size: 13px; opacity: 0.85; line-height: 1.45; }

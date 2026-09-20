@@ -184,13 +184,21 @@ function renderLandingPage() {
   return `
     <div class="auth-shell">
       <div class="auth-hero">
+        <div class="auth-blobs">
+          <div class="blob blob-1"></div>
+          <div class="blob blob-2"></div>
+          <div class="blob blob-3"></div>
+        </div>
         <div class="auth-hero-inner">
           <div class="auth-brand">
             <span class="brand-mark" style="width:38px;height:38px;font-size:17px;">PX</span>
             <span>PXDynasty</span>
           </div>
           <p class="auth-eyebrow">Local marketplace · delivered</p>
-          <h1 class="auth-title">Everything local.<br/>Delivered to your door.</h1>
+          <h1 class="auth-title">
+            Everything local.<br/>
+            <span class="auth-title-accent">Delivered to your door.</span>
+          </h1>
           <p class="auth-lead">
             PXDynasty connects neighbourhood businesses and customers with fast,
             reliable delivery — one checkout, one delivery, one platform.
@@ -205,12 +213,81 @@ function renderLandingPage() {
             <div class="auth-meta-item"><strong>Simple</strong><span>Pay once, we handle the rest</span></div>
           </div>
         </div>
+
+        <div class="auth-floaters" aria-hidden="true">
+          <div class="floater floater-1">
+            <div class="floater-icon">🧺</div>
+            <div class="floater-meta">
+              <span class="floater-name">Fresh produce</span>
+              <span class="floater-price">₦4,500</span>
+            </div>
+          </div>
+          <div class="floater floater-2">
+            <div class="floater-icon">🍗</div>
+            <div class="floater-meta">
+              <span class="floater-name">Poultry today</span>
+              <span class="floater-price">₦8,200</span>
+            </div>
+          </div>
+          <div class="floater floater-3">
+            <div class="floater-icon">🛵</div>
+            <div class="floater-meta">
+              <span class="floater-name">Delivery in</span>
+              <span class="floater-price">24 min</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="auth-panel" id="auth-panel">
-        ${renderAuthPanel('login')}
+      <div class="auth-right">
+        <div class="auth-right-inner">
+          <div class="auth-panel" id="auth-panel">
+            ${renderAuthPanel('login')}
+          </div>
+        </div>
       </div>
     </div>
+
+    <section class="landing-how">
+      <div class="landing-how-inner">
+        <p class="auth-eyebrow" style="color:var(--color-accent-dark)">How it works</p>
+        <h2 class="landing-h2">Three steps. No friction.</h2>
+        <div class="landing-steps">
+          <div class="landing-step">
+            <div class="landing-step-num">1</div>
+            <h3>Browse local</h3>
+            <p>See what's fresh at businesses around you — shops, farms, kitchens, all in one place.</p>
+          </div>
+          <div class="landing-step">
+            <div class="landing-step-num">2</div>
+            <h3>One checkout</h3>
+            <p>Pay once. We split the payment between the business and the delivery agent automatically.</p>
+          </div>
+          <div class="landing-step">
+            <div class="landing-step-num">3</div>
+            <h3>Tracked delivery</h3>
+            <p>A verified agent picks up your order and brings it to your door. You can watch every step.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-trust">
+      <div class="landing-trust-inner">
+        <div class="trust-item">
+          <strong>Every business verified</strong>
+          <span>We review each seller before they go live.</span>
+        </div>
+        <div class="trust-item">
+          <strong>Your money held safely</strong>
+          <span>Businesses only get paid when you receive your order.</span>
+        </div>
+        <div class="trust-item">
+          <strong>Real delivery agents</strong>
+          <span>Tracked, rated, and accountable for every delivery.</span>
+        </div>
+      </div>
+    </section>
   `;
 }
 
