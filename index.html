@@ -17,6 +17,14 @@
 <div id="toast-root" aria-live="polite"></div>
 <div class="modal-overlay" id="modal-root"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>
+  // Debug console — enabled by adding ?debug=1 to the URL.
+  // Loads Eruda, a mobile-friendly DevTools panel.
+  if (location.search.indexOf('debug=1') !== -1) {
+    eruda.init();
+  }
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-client.js"></script>
 <script src="auth.js"></script>

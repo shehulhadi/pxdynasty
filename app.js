@@ -2270,7 +2270,19 @@ function handleAction(el, ev) {
         const errEl = document.getElementById('cb-error'); if (errEl) errEl.textContent = res.error;
         toast(res.error, 'error'); break;
       }
+      console.log('[createBusiness] result:', res);
       toast('Business created: ' + res.business.name, 'success');
+      // Immediately verify it landed in DB.
+      const verify = DB.businesses.find((b) => b.id === res.business.id);
+      console.log('[createBusiness] in DB after create?', !!verify, 'DB.businesses.length =', DB.businesses.length);
+      // Force a cloud sync right now so we don't wait for the next saveData().
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertBusiness) {
+        window.PXDynastySBC.upsertBusiness(res.business).then((r) => {
+          console.log('[createBusiness] cloud upsert:', r);
+        });
+      } else {
+        console.warn('[createBusiness] PXDynastySBC missing — cloud sync skipped');
+      }
       navigate('admin-businesses');
       break;
     }
