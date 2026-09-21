@@ -251,7 +251,13 @@ async function authCreateBusinessAccount(opts) {
   if (db) {
     db.businesses.push(bizRecord);
     if (window.PXDynastySBC && window.PXDynastySBC.upsertBusiness) {
-      await window.PXDynastySBC.upsertBusiness(bizRecord);
+      const bizRes = await window.PXDynastySBC.upsertBusiness(bizRecord);
+      if (!bizRes.ok) {
+        console.error('business upsert failed', bizRes);
+        return { ok: false, error: 'Business save failed: ' + (bizRes.error || 'unknown') };
+      }
+    } else {
+      return { ok: false, error: 'Supabase client not available (window.PXDynastySBC missing)' };
     }
   }
 
@@ -264,7 +270,7 @@ async function authCreateBusinessAccount(opts) {
     business_id: bizId,
   };
   const ins = await usersInsert(userRow);
-  if (!ins.ok) return { ok: false, error: ins.error };
+  if (!ins.ok) return { ok: false, error: 'User insert failed: ' + ins.error };
 
   return { ok: true, user: userRowToApp(ins.user), business: bizRecord };
 }
