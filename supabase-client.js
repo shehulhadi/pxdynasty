@@ -57,6 +57,7 @@ function sbcRowToProduct(r) {
     sales: r.sales,
     hue: r.hue,
     emoji: r.emoji,
+    imageUrl: r.image_url,
     createdAt: r.created_at,
   };
 }
@@ -132,7 +133,7 @@ function sbcProductToRow(p) {
     category: p.category, description: p.description, sku: p.sku,
     price: p.price, discount_price: p.discountPrice, stock: p.stock,
     status: p.status, rating: p.rating, sales: p.sales,
-    hue: p.hue, emoji: p.emoji,
+    hue: p.hue, emoji: p.emoji, image_url: p.imageUrl || null,
   };
 }
 function sbcOrderToRow(o) {
@@ -214,6 +215,27 @@ async function sbcDelete(table, id) {
   }
 }
 
+/* Upload a File to the product-images bucket. Returns { ok, url }. */
+async function sbcUploadProductImage(file) {
+  const c = sbcInit();
+  if (!c) return { ok: false, error: 'no client' };
+  if (!file) return { ok: false, error: 'no file' };
+  const ext = (file.name && file.name.split('.').pop()) || 'jpg';
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  try {
+    const { error } = await c.storage.from('product-images').upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || 'image/jpeg',
+    });
+    if (error) { console.error('upload', error); return { ok: false, error: error.message }; }
+    const { data } = c.storage.from('product-images').getPublicUrl(path);
+    return { ok: true, url: data.publicUrl };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
 /* Expose globally for app.js to call. */
 window.PXDynastySBC = {
   init: sbcInit,
@@ -225,4 +247,5 @@ window.PXDynastySBC = {
   upsertAgent:    (a) => sbcUpsert('agents', sbcAgentToRow(a)),
   deleteBusiness: (id) => sbcDelete('businesses', id),
   deleteProduct:  (id) => sbcDelete('products', id),
+  uploadProductImage: sbcUploadProductImage,
 };

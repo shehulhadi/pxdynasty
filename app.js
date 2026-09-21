@@ -657,7 +657,9 @@ function productCardHtml(p) {
   const outOfStock = p.status === 'out_of_stock' || p.stock === 0;
   return `<div class="product-card pressable" data-action="nav" data-view="product" data-id="${p.id}">
     <div class="thumb">
-      ${placeholderThumb(p.hue, p.emoji)}
+      ${p.imageUrl
+        ? `<img src="${escapeHtml(p.imageUrl)}" alt="${escapeHtml(p.name)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;" />`
+        : placeholderThumb(p.hue, p.emoji)}
       ${outOfStock ? `<span class="stock-flag">Out of stock</span>` : ''}
       ${p.discountPrice ? `<span class="discount-flag">-${Math.round((1 - p.discountPrice / p.price) * 100)}%</span>` : ''}
     </div>
@@ -795,7 +797,11 @@ function customerProductDetail(id) {
   return `
     ${backBtn('Back')}
     <div class="grid-2">
-      <div><div class="card card-flush" style="aspect-ratio:1/1;">${placeholderThumb(p.hue, p.emoji, true)}</div></div>
+      <div><div class="card card-flush" style="aspect-ratio:1/1;overflow:hidden;">
+        ${p.imageUrl
+          ? `<img src="${escapeHtml(p.imageUrl)}" alt="${escapeHtml(p.name)}" style="width:100%;height:100%;object-fit:cover;" />`
+          : placeholderThumb(p.hue, p.emoji, true)}
+      </div></div>
       <div>
         <div class="flex items-center gap-6" style="margin-top:14px;">
           <span class="chip">${(CATEGORIES.find((c) => c.id === p.category) || {}).name || ''}</span>
@@ -1365,7 +1371,13 @@ function businessAddProduct(biz, editId) {
     <div class="page-head"><h1>${editing ? 'Edit product' : 'Add product'}</h1></div>
     <div class="card">
       <div class="form-group"><label>Product image</label>
-        <div class="image-upload-box">${ICONS.box}<div>Image upload coming soon</div></div>
+        <div class="image-upload-box" id="pf-image-box" style="cursor:pointer;position:relative;overflow:hidden;">
+          ${editing && editing.imageUrl
+            ? `<img src="${escapeHtml(editing.imageUrl)}" alt="" style="max-height:180px;margin:0 auto;border-radius:var(--radius-sm);" />`
+            : `${ICONS.box}<div>Tap to choose a photo from your device</div>`}
+          <input type="file" id="pf-image" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+        </div>
+        <div class="hint" id="pf-image-status"></div>
       </div>
       <div class="form-group"><label>Product name</label><input type="text" id="pf-name" value="${editing ? escapeHtml(editing.name) : ''}" placeholder="e.g. Fresh Tomatoes (Basket)" /></div>
       <div class="form-row">
@@ -2361,6 +2373,8 @@ function placeOrderFlow() {
   }, 900);
 }
 
+let _pendingProductImageUrl = null;
+
 function saveProductForm(editId) {
   const name = document.getElementById('pf-name').value.trim();
   if (!name) { toast('Product name is required', 'error'); return; }
@@ -2375,16 +2389,30 @@ function saveProductForm(editId) {
 
   if (editId) {
     const p = getProduct(editId);
-    if (p) Object.assign(p, { name, category, price, discountPrice: discount, stock, status: stock === 0 ? 'out_of_stock' : status, description: desc, sku });
+    if (p) Object.assign(p, {
+      name, category, price, discountPrice: discount, stock,
+      status: stock === 0 ? 'out_of_stock' : status,
+      description: desc, sku,
+      imageUrl: _pendingProductImageUrl || p.imageUrl || null,
+    });
     toast('Product updated', 'success');
   } else {
     DB.products.push({
-      id: genId('prod'), businessId: state.currentBusinessId, name, category, description: desc || name, sku,
-      price, discountPrice: discount, stock, status: stock === 0 ? 'out_of_stock' : status, rating: '—', sales: 0,
-      hue: Math.floor(Math.random() * 360), emoji: categoryEmoji(category), createdAt: new Date().toISOString(),
+      id: genId('prod'),
+      businessId: state.currentBusinessId,
+      name, category,
+      description: desc || name,
+      sku, price, discountPrice: discount, stock,
+      status: stock === 0 ? 'out_of_stock' : status,
+      rating: '—', sales: 0,
+      hue: Math.floor(Math.random() * 360),
+      emoji: categoryEmoji(category),
+      imageUrl: _pendingProductImageUrl || null,
+      createdAt: new Date().toISOString(),
     });
     toast('Product added', 'success');
   }
+  _pendingProductImageUrl = null;
   saveData(DB);
   navigate('biz-products');
 }
@@ -2424,6 +2452,39 @@ document.addEventListener('click', (e) => {
   if (overlay && e.target === overlay) closeModal();
   if (!el) return;
   handleAction(el, e);
+});
+
+document.addEventListener('change', async (e) => {
+  if (e.target && e.target.id === 'pf-image' && e.target.files && e.target.files[0]) {
+    const file = e.target.files[0];
+    const status = document.getElementById('pf-image-status');
+    if (status) status.textContent = 'Uploading…';
+    const sbcMod = window.PXDynastySBC;
+    if (!sbcMod || !sbcMod.uploadProductImage) {
+      if (status) status.textContent = 'Upload module not available.';
+      return;
+    }
+    const res = await sbcMod.uploadProductImage(file);
+    if (!res.ok) {
+      if (status) status.textContent = 'Upload failed: ' + (res.error || 'unknown');
+      toast('Image upload failed', 'error');
+      return;
+    }
+    _pendingProductImageUrl = res.url;
+    if (status) status.textContent = 'Uploaded ✓';
+    const box = document.getElementById('pf-image-box');
+    if (box) {
+      const img = document.createElement('img');
+      img.src = res.url;
+      img.alt = '';
+      img.style.maxHeight = '180px';
+      img.style.margin = '0 auto';
+      img.style.borderRadius = 'var(--radius-sm)';
+      // Clear old placeholder content but keep the file input.
+      box.querySelectorAll('svg, div').forEach((n) => n.remove());
+      box.insertBefore(img, box.querySelector('input'));
+    }
+  }
 });
 
 document.addEventListener('keydown', (e) => {
