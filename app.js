@@ -2515,20 +2515,29 @@ function handleAction(el, ev) {
     case 'admin-create-agent': {
       const A = window.PXDynastyAuth;
       if (!A || !A.createAgentAccount) { toast('Auth module not loaded', 'error'); break; }
-      const res = A.createAgentAccount({
+      const errEl0 = document.getElementById('ca-error'); if (errEl0) errEl0.textContent = 'Creating…';
+      A.createAgentAccount({
         name:    (document.getElementById('ca-name') || {}).value || '',
         phone:   (document.getElementById('ca-phone') || {}).value || '',
         vehicle: (document.getElementById('ca-vehicle') || {}).value || 'Motorcycle',
         operatingArea: (document.getElementById('ca-area') || {}).value || '',
         email:    (document.getElementById('ca-email') || {}).value || '',
         password: (document.getElementById('ca-password') || {}).value || '',
+      }).then((res) => {
+        const errEl = document.getElementById('ca-error');
+        if (!res.ok) {
+          if (errEl) errEl.textContent = res.error || '(no error message)';
+          toast(res.error || 'Create agent failed', 'error');
+          return;
+        }
+        if (errEl) errEl.textContent = '';
+        toast('Agent created: ' + res.agent.name, 'success');
+        navigate('admin-agents');
+      }).catch((e) => {
+        const errEl = document.getElementById('ca-error');
+        if (errEl) errEl.textContent = 'Exception: ' + String(e);
+        toast('Exception: ' + String(e), 'error');
       });
-      if (!res.ok) {
-        const errEl = document.getElementById('ca-error'); if (errEl) errEl.textContent = res.error;
-        toast(res.error, 'error'); break;
-      }
-      toast('Agent created: ' + res.agent.name, 'success');
-      navigate('admin-agents');
       break;
     }
     case 'admin-process-settlement': { createSettlement(el.dataset.id); render(); toast('Settlement processed', 'success'); break; }

@@ -384,7 +384,12 @@ async function authCreateAgentAccount(opts) {
   if (db) {
     db.agents.push(agentRecord);
     if (window.PXDynastySBC && window.PXDynastySBC.upsertAgent) {
-      await window.PXDynastySBC.upsertAgent(agentRecord);
+      const agRes = await window.PXDynastySBC.upsertAgent(agentRecord);
+      if (!agRes || !agRes.ok) {
+        return { ok: false, error: 'Agent save failed: ' + ((agRes && agRes.error) || 'unknown') };
+      }
+    } else {
+      return { ok: false, error: 'Supabase client not available (window.PXDynastySBC missing)' };
     }
   }
 
