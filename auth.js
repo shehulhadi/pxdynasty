@@ -281,6 +281,7 @@ async function authCreateBusinessAccount(opts) {
     } else {
       return { ok: false, error: 'Supabase client not available (window.PXDynastySBC missing)' };
     }
+    try { saveDataLocalOnly(); } catch (e) {}
   }
 
   const userId = 'u-' + Math.random().toString(36).slice(2, 10);
@@ -430,6 +431,7 @@ async function authCreateAgentAccount(opts) {
     } else {
       return { ok: false, error: 'Supabase client not available (window.PXDynastySBC missing)' };
     }
+    try { saveDataLocalOnly(); } catch (e) {}
   }
 
   const userId = 'u-' + Math.random().toString(36).slice(2, 10);
