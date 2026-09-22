@@ -1717,6 +1717,7 @@ function renderAdminView() {
     case 'admin-businesses': return adminBusinesses();
     case 'admin-business-detail': return adminBusinessDetail(state.params.id);
     case 'admin-business-new': return adminBusinessNew();
+    case 'admin-business-edit': return adminBusinessEdit(state.params.id);
     case 'admin-agent-new': return adminAgentNew();
     case 'admin-customers': return adminCustomers();
     case 'admin-products': return adminProducts();
@@ -1857,6 +1858,7 @@ function adminBusinesses() {
         </div>
         <div class="row-card-actions">
           <button class="btn btn-outline btn-sm" data-action="nav" data-view="admin-business-detail" data-id="${b.id}">View</button>
+          <button class="btn btn-outline btn-sm" data-action="nav" data-view="admin-business-edit" data-id="${b.id}">Edit</button>
           ${b.status === 'pending' ? `<button class="btn btn-primary btn-sm" data-action="admin-approve-biz" data-id="${b.id}">Approve</button><button class="btn btn-danger btn-sm" data-action="admin-reject-biz" data-id="${b.id}">Reject</button>` : ''}
           ${b.status === 'active' ? `<button class="btn btn-danger btn-sm" data-action="admin-suspend-biz" data-id="${b.id}">Suspend</button>` : ''}
           ${b.status === 'suspended' ? `<button class="btn btn-primary btn-sm" data-action="admin-reactivate-biz" data-id="${b.id}">Reactivate</button>` : ''}
@@ -1874,7 +1876,13 @@ function adminBusinessDetail(id) {
   const revenue = orders.filter((o) => o.status === 'delivered').reduce((s, o) => s + o.subtotal, 0);
   return `
     ${backBtn('Businesses')}
-    <div class="page-head"><div><h1>${escapeHtml(b.name)}</h1><div class="sub">${escapeHtml(b.ownerName || '')} · ${escapeHtml(b.phone || '')} · ${escapeHtml(b.email || '')}</div></div><span class="status-badge ${BIZ_STATUS_CLASS[b.status]}">${b.status}</span></div>
+    <div class="page-head">
+      <div><h1>${escapeHtml(b.name)}</h1><div class="sub">${escapeHtml(b.ownerName || '')} · ${escapeHtml(b.phone || '')} · ${escapeHtml(b.email || '')}</div></div>
+      <div class="flex gap-8 items-center">
+        <span class="status-badge ${BIZ_STATUS_CLASS[b.status]}">${b.status}</span>
+        <button class="btn btn-outline btn-sm" data-action="nav" data-view="admin-business-edit" data-id="${b.id}">${ICONS.edit} Edit</button>
+      </div>
+    </div>
     <div class="metric-grid">
       ${metricCard('Orders', orders.length, '')}
       ${metricCard('Revenue', formatNaira(revenue), '')}
@@ -2164,6 +2172,48 @@ function adminBusinessNew() {
   `;
 }
 
+function adminBusinessEdit(id) {
+  const b = getBusiness(id);
+  if (!b) return emptyState('store', 'Not found', 'This business no longer exists.', null);
+  return `
+    ${backBtn('Businesses')}
+    <div class="page-head"><h1>Edit business</h1><div class="sub">${escapeHtml(b.name)}</div></div>
+    <div class="card">
+      <strong style="font-size:13px;">Business details</strong>
+      <div class="form-group mt-12"><label>Business name</label><input type="text" id="eb-bizName" value="${escapeHtml(b.name)}" /></div>
+      <div class="form-row">
+        <div class="form-group"><label>Owner name</label><input type="text" id="eb-ownerName" value="${escapeHtml(b.ownerName || '')}" /></div>
+        <div class="form-group"><label>Category</label>
+          <select id="eb-category">${CATEGORIES.map((c) => `<option value="${c.id}" ${c.id === b.category ? 'selected' : ''}>${c.name}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Phone</label><input type="tel" id="eb-phone" value="${escapeHtml(b.phone || '')}" /></div>
+        <div class="form-group"><label>Email</label><input type="email" id="eb-email" value="${escapeHtml(b.email || '')}" /></div>
+      </div>
+      <div class="form-group"><label>Address</label><input type="text" id="eb-address" value="${escapeHtml(b.address || '')}" /></div>
+      <div class="form-row">
+        <div class="form-group"><label>Status</label>
+          <select id="eb-status">
+            ${['active','pending','suspended','rejected'].map((s) => `<option value="${s}" ${s === b.status ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Verified</label>
+          <select id="eb-verified">
+            <option value="true" ${b.verified ? 'selected' : ''}>Yes</option>
+            <option value="false" ${!b.verified ? 'selected' : ''}>No</option>
+          </select>
+        </div>
+      </div>
+      <div class="auth-error" id="eb-error" style="margin:6px 0 0;"></div>
+    </div>
+    <div class="sticky-bottom-bar">
+      <button class="btn btn-outline btn-block" data-action="back">Cancel</button>
+      <button class="btn btn-primary btn-block" data-action="admin-update-business" data-id="${b.id}">Save changes</button>
+    </div>
+  `;
+}
+
 function adminAgentNew() {
   return `
     ${backBtn('Delivery agents')}
@@ -2436,6 +2486,29 @@ function handleAction(el, ev) {
     }
     case 'admin-process-settlement': { createSettlement(el.dataset.id); render(); toast('Settlement processed', 'success'); break; }
 
+    case 'admin-update-business': {
+      const id = el.dataset.id;
+      const b = getBusiness(id);
+      if (!b) { toast('Business not found', 'error'); break; }
+      b.name = (document.getElementById('eb-bizName') || {}).value || b.name;
+      b.ownerName = (document.getElementById('eb-ownerName') || {}).value || b.ownerName;
+      b.category = (document.getElementById('eb-category') || {}).value || b.category;
+      b.phone = (document.getElementById('eb-phone') || {}).value || '';
+      b.email = (document.getElementById('eb-email') || {}).value || '';
+      b.address = (document.getElementById('eb-address') || {}).value || '';
+      b.status = (document.getElementById('eb-status') || {}).value || b.status;
+      const vEl = document.getElementById('eb-verified');
+      b.verified = vEl ? vEl.value === 'true' : b.verified;
+      saveData(DB);
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertBusiness) {
+        window.PXDynastySBC.upsertBusiness(b).then((r) => {
+          if (!r.ok) toast('Saved locally but cloud sync failed: ' + r.error, 'error');
+        });
+      }
+      toast('Business updated', 'success');
+      navigate('admin-business-detail', { id });
+      break;
+    }
     case 'biz-create-staff': {
       const A = window.PXDynastyAuth;
       if (!A || !A.createStaffAccount) { toast('Auth module not loaded', 'error'); break; }
