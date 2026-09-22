@@ -211,6 +211,20 @@ function genId(prefix) { return prefix + '-' + Math.random().toString(36).slice(
 function genOrderNumber() { return 'MK-' + (10000 + Math.floor(Math.random() * 89999)); }
 function genOtp() { return String(1000 + Math.floor(Math.random() * 9000)); }
 
+/* Human-friendly random password: two short words + 4 digits.
+   Example: "tiger-bread-2841" — easy to type and share over WhatsApp. */
+function genReadablePassword() {
+  const words = [
+    'tiger','eagle','river','mango','sunset','stone','falcon','lion','cedar','ocean',
+    'palm','star','moon','wind','fire','cloud','jade','onyx','amber','pearl',
+    'kite','bread','mint','sage','clay','rain','gold','salt','honey','silk',
+  ];
+  const w1 = words[Math.floor(Math.random() * words.length)];
+  const w2 = words[Math.floor(Math.random() * words.length)];
+  const n = 1000 + Math.floor(Math.random() * 9000);
+  return w1 + '-' + w2 + '-' + n;
+}
+
 function timeAgo(iso) {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
   if (diff < 60) return 'just now';
@@ -2161,7 +2175,13 @@ function adminBusinessNew() {
       <p class="text-sm text-muted mt-8">Share these with the business owner. They log in at this same page.</p>
       <div class="form-row">
         <div class="form-group"><label>Email</label><input type="email" id="cb-email" placeholder="owner@example.com" /></div>
-        <div class="form-group"><label>Password (min 6 chars)</label><input type="text" id="cb-password" placeholder="e.g. shehu-2026" /></div>
+        <div class="form-group">
+          <label>Password (min 6 chars)</label>
+          <div class="flex gap-8">
+            <input type="text" id="cb-password" placeholder="Tap generate →" style="flex:1;" />
+            <button type="button" class="btn btn-outline btn-sm" data-action="gen-password" data-target="cb-password">Generate</button>
+          </div>
+        </div>
       </div>
       <div class="auth-error" id="cb-error" style="margin:6px 0 0;"></div>
     </div>
@@ -2238,7 +2258,13 @@ function adminAgentNew() {
       <p class="text-sm text-muted mt-8">Share these with the agent.</p>
       <div class="form-row">
         <div class="form-group"><label>Email</label><input type="email" id="ca-email" placeholder="agent@example.com" /></div>
-        <div class="form-group"><label>Password (min 6 chars)</label><input type="text" id="ca-password" placeholder="e.g. musa-2026" /></div>
+        <div class="form-group">
+          <label>Password (min 6 chars)</label>
+          <div class="flex gap-8">
+            <input type="text" id="ca-password" placeholder="Tap generate →" style="flex:1;" />
+            <button type="button" class="btn btn-outline btn-sm" data-action="gen-password" data-target="ca-password">Generate</button>
+          </div>
+        </div>
       </div>
       <div class="auth-error" id="ca-error" style="margin:6px 0 0;"></div>
     </div>
@@ -2261,7 +2287,13 @@ function businessTeam(biz) {
       </div>
       <div class="form-row">
         <div class="form-group"><label>Email</label><input type="email" id="st-email" placeholder="staff@example.com" /></div>
-        <div class="form-group"><label>Password (min 6 chars)</label><input type="text" id="st-password" placeholder="e.g. staff-2026" /></div>
+        <div class="form-group">
+          <label>Password (min 6 chars)</label>
+          <div class="flex gap-8">
+            <input type="text" id="st-password" placeholder="Tap generate →" style="flex:1;" />
+            <button type="button" class="btn btn-outline btn-sm" data-action="gen-password" data-target="st-password">Generate</button>
+          </div>
+        </div>
       </div>
       <div class="auth-error" id="st-error" style="margin:6px 0 0;"></div>
       <button class="btn btn-primary btn-block mt-12" data-action="biz-create-staff">Create staff account</button>
@@ -2486,6 +2518,18 @@ function handleAction(el, ev) {
     }
     case 'admin-process-settlement': { createSettlement(el.dataset.id); render(); toast('Settlement processed', 'success'); break; }
 
+    case 'gen-password': {
+      const targetId = el.dataset.target;
+      const elIn = document.getElementById(targetId);
+      if (!elIn) break;
+      const pw = genReadablePassword();
+      elIn.value = pw;
+      // Also select so the user can long-press → copy.
+      elIn.focus();
+      elIn.select && elIn.select();
+      toast('Password generated — long-press the field to copy', 'success');
+      break;
+    }
     case 'admin-update-business': {
       const id = el.dataset.id;
       const b = getBusiness(id);
