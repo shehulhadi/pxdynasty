@@ -1081,9 +1081,12 @@ function customerCheckout() {
       <button class="btn btn-outline btn-sm" data-action="add-address-inline">${ICONS.plus} Add new address</button>
     </div>`;
   } else if (step === 2) {
+    const authUser = window.PXDynastyAuth && window.PXDynastyAuth.currentUserSync && window.PXDynastyAuth.currentUserSync();
+    const fallbackEmail = checkoutData.email || (cust && cust.email) || (authUser && authUser.email) || '';
     body = `<div class="card">
       <div class="form-group"><label>Full name</label><input type="text" id="ck-name" value="${escapeHtml(checkoutData.name)}" /></div>
       <div class="form-group"><label>Phone number</label><input type="tel" id="ck-phone" value="${escapeHtml(checkoutData.phone)}" /></div>
+      <div class="form-group"><label>Email (for payment receipt)</label><input type="email" id="ck-email" value="${escapeHtml(fallbackEmail)}" placeholder="you@example.com" /></div>
       <div class="form-group mb-0"><label>Delivery instructions (optional)</label><textarea id="ck-instructions" placeholder="e.g. Call when you arrive at the gate">${escapeHtml(checkoutData.instructions)}</textarea></div>
     </div>`;
   } else if (step === 3) {
@@ -2950,10 +2953,22 @@ function captureCheckoutStepInputs(step) {
     const freeform = document.getElementById('ck-address-freeform');
     if (freeform) state.checkoutData.address = freeform.value;
   } else if (step === 2) {
-    const name = document.getElementById('ck-name'), phone = document.getElementById('ck-phone'), instr = document.getElementById('ck-instructions');
+    const name = document.getElementById('ck-name'), phone = document.getElementById('ck-phone'), instr = document.getElementById('ck-instructions'), email = document.getElementById('ck-email');
     if (name) state.checkoutData.name = name.value;
     if (phone) state.checkoutData.phone = phone.value;
+    if (email) state.checkoutData.email = email.value;
     if (instr) state.checkoutData.instructions = instr.value;
+
+    // Persist phone + email onto the customer record so they're pre-filled next time.
+    const cust = getCustomer(state.currentCustomerId);
+    if (cust) {
+      if (phone && phone.value) cust.phone = phone.value;
+      if (email && email.value) cust.email = email.value;
+      saveDataLocalOnly();
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertCustomer) {
+        window.PXDynastySBC.upsertCustomer(cust).catch(() => {});
+      }
+    }
   }
 }
 
@@ -2966,9 +2981,12 @@ async function placeOrderFlow() {
 
   // We need an email for Paystack. Fall back to the signed-in customer's email.
   const cust = getCustomer(state.currentCustomerId) || {};
-  const email = (cust.email || '').trim() || (cd && cd.email || '').trim();
+  const authUser = window.PXDynastyAuth && window.PXDynastyAuth.currentUserSync && window.PXDynastyAuth.currentUserSync();
+  const email = (cd && cd.email || '').trim()
+              || (cust.email || '').trim()
+              || (authUser && authUser.email || '').trim();
   if (!email) {
-    toast('An email address is required to pay. Add it in your account settings.', 'error');
+    toast('An email address is required to pay. Go back and add it on the details step.', 'error');
     return;
   }
 

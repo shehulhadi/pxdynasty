@@ -214,6 +214,22 @@ async function authApplySessionToApp() {
     appState.role = 'customer';
     appState.view = 'home';
     appState.currentCustomerId = user.customerId || null;
+    // Backfill email/name on the customer record if missing.
+    const db2 = authAppDb();
+    if (db2 && user.customerId) {
+      const cust = db2.customers.find((c) => c.id === user.customerId);
+      if (cust) {
+        let changed = false;
+        if (!cust.email && user.email) { cust.email = user.email; changed = true; }
+        if (!cust.name && user.name)  { cust.name = user.name; changed = true; }
+        if (changed) {
+          saveDataLocalOnly();
+          if (window.PXDynastySBC && window.PXDynastySBC.upsertCustomer) {
+            window.PXDynastySBC.upsertCustomer(cust).catch(() => {});
+          }
+        }
+      }
+    }
   }
   return true;
 }
