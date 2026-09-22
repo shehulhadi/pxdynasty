@@ -277,7 +277,7 @@ function sbcNotificationToRow(n) {
 /* Call the Supabase Edge Function that verifies a Paystack payment.
    Returns { ok: true, order } | { ok: false, error } | { ok: true, already_processed: true, order } */
 async function sbcVerifyPayment(reference, orderDraft) {
-  const url = SUPABASE_URL + '/functions/v1/verify-payment';
+  const url = SUPABASE_URL + '/functions/v1/dynamic-service';
   try {
     const r = await fetch(url, {
       method: 'POST',
