@@ -1739,6 +1739,7 @@ function renderAdminView() {
     case 'admin-order-detail': return adminOrderDetail(state.params.orderId);
     case 'admin-agents': return adminAgents();
     case 'admin-agent-detail': return adminAgentDetail(state.params.id);
+    case 'admin-agent-edit': return adminAgentEdit(state.params.id);
     case 'admin-payments': return adminPayments();
     case 'admin-settlements': return adminSettlements();
     case 'admin-commissions': return adminCommissions();
@@ -2021,7 +2022,10 @@ function adminAgents() {
     </div>
     ${list.length ? `<div class="row-cards">${list.map((a) => `<div class="row-card flex items-center justify-between">
       <div><div style="font-weight:700;font-size:13.5px;">${escapeHtml(a.name)} <span class="status-badge ${AGENT_STATUS_CLASS[a.status]}">${a.status}</span></div><div class="text-sm text-muted">${a.vehicle} · ⭐ ${a.rating || '—'} · ${a.completedDeliveries || 0} deliveries</div></div>
-      <button class="btn btn-outline btn-sm" data-action="nav" data-view="admin-agent-detail" data-id="${a.id}">View</button>
+      <div class="flex gap-8">
+        <button class="btn btn-outline btn-sm" data-action="nav" data-view="admin-agent-detail" data-id="${a.id}">View</button>
+        <button class="btn btn-outline btn-sm" data-action="nav" data-view="admin-agent-edit" data-id="${a.id}">Edit</button>
+      </div>
     </div>`).join('')}</div>` : emptyState('bike', 'No delivery agents', 'Agents will appear here once they register.', null)}
   `;
 }
@@ -2032,7 +2036,13 @@ function adminAgentDetail(id) {
   const orders = getOrders({ agentId: id });
   return `
     ${backBtn('Delivery agents')}
-    <div class="page-head"><div><h1>${escapeHtml(a.name)}</h1><div class="sub">${escapeHtml(a.phone || '')} · ${a.vehicle} · ${escapeHtml(a.operatingArea || '')}</div></div><span class="status-badge ${AGENT_STATUS_CLASS[a.status]}">${a.status}</span></div>
+    <div class="page-head">
+      <div><h1>${escapeHtml(a.name)}</h1><div class="sub">${escapeHtml(a.phone || '')} · ${a.vehicle} · ${escapeHtml(a.operatingArea || '')}</div></div>
+      <div class="flex gap-8 items-center">
+        <span class="status-badge ${AGENT_STATUS_CLASS[a.status]}">${a.status}</span>
+        <button class="btn btn-outline btn-sm" data-action="nav" data-view="admin-agent-edit" data-id="${a.id}">${ICONS.edit} Edit</button>
+      </div>
+    </div>
     <div class="metric-grid">
       ${metricCard('Completed', a.completedDeliveries || 0, '')}
       ${metricCard('Rating', '⭐ ' + (a.rating || '—'), '')}
@@ -2245,6 +2255,63 @@ function adminBusinessEdit(id) {
     <div class="sticky-bottom-bar">
       <button class="btn btn-outline btn-block" data-action="back">Cancel</button>
       <button class="btn btn-primary btn-block" data-action="admin-update-business" data-id="${b.id}">Save changes</button>
+    </div>
+  `;
+}
+
+function adminAgentEdit(id) {
+  const a = getAgent(id);
+  if (!a) return emptyState('bike', 'Not found', 'This agent no longer exists.', null);
+  return `
+    ${backBtn('Delivery agents')}
+    <div class="page-head"><h1>Edit agent</h1><div class="sub">${escapeHtml(a.name)}</div></div>
+    <div class="card">
+      <strong style="font-size:13px;">Agent details</strong>
+      <div class="form-row mt-12">
+        <div class="form-group"><label>Full name</label><input type="text" id="ea-name" value="${escapeHtml(a.name)}" /></div>
+        <div class="form-group"><label>Phone</label><input type="tel" id="ea-phone" value="${escapeHtml(a.phone || '')}" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Vehicle</label>
+          <select id="ea-vehicle">
+            ${['Motorcycle','Bicycle','Tricycle (Keke)','Van','Car'].map((v) => `<option value="${v}" ${v === a.vehicle ? 'selected' : ''}>${v}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Operating area</label><input type="text" id="ea-area" value="${escapeHtml(a.operatingArea || '')}" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Status</label>
+          <select id="ea-status">
+            ${['online','offline','delivering'].map((s) => `<option value="${s}" ${s === a.status ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>Verified</label>
+          <select id="ea-verified">
+            <option value="true" ${a.verified ? 'selected' : ''}>Yes</option>
+            <option value="false" ${!a.verified ? 'selected' : ''}>No</option>
+          </select>
+        </div>
+      </div>
+      <div class="auth-error" id="ea-error" style="margin:6px 0 0;"></div>
+    </div>
+
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Reset agent password</strong>
+      <p class="text-sm text-muted mt-8">Use this if the agent lost access to their login.</p>
+      <div class="form-group mt-12">
+        <label>New password (min 6 chars)</label>
+        <div class="flex gap-8">
+          <input type="text" id="ea-newPassword" placeholder="Tap generate →" style="flex:1;" />
+          <button type="button" class="btn btn-outline btn-sm" data-action="gen-password" data-target="ea-newPassword">Generate</button>
+        </div>
+      </div>
+      <div class="auth-error" id="ea-pw-error" style="margin:6px 0 0;"></div>
+      <button class="btn btn-primary btn-block mt-12" data-action="admin-reset-agent-password" data-id="${a.id}">Reset password</button>
+    </div>
+
+    <div class="sticky-bottom-bar">
+      <button class="btn btn-outline btn-block" data-action="back">Cancel</button>
+      <button class="btn btn-primary btn-block" data-action="admin-update-agent" data-id="${a.id}">Save changes</button>
     </div>
   `;
 }
@@ -2552,6 +2619,49 @@ function handleAction(el, ev) {
       elIn.focus();
       elIn.select && elIn.select();
       toast('Password generated — long-press the field to copy', 'success');
+      break;
+    }
+    case 'admin-update-agent': {
+      const id = el.dataset.id;
+      const a = getAgent(id);
+      if (!a) { toast('Agent not found', 'error'); break; }
+      a.name = (document.getElementById('ea-name') || {}).value || a.name;
+      a.phone = (document.getElementById('ea-phone') || {}).value || '';
+      a.vehicle = (document.getElementById('ea-vehicle') || {}).value || a.vehicle;
+      a.operatingArea = (document.getElementById('ea-area') || {}).value || '';
+      a.status = (document.getElementById('ea-status') || {}).value || a.status;
+      const vEl = document.getElementById('ea-verified');
+      a.verified = vEl ? vEl.value === 'true' : a.verified;
+      saveData(DB);
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertAgent) {
+        window.PXDynastySBC.upsertAgent(a).then((r) => {
+          if (!r.ok) toast('Saved locally but cloud sync failed: ' + r.error, 'error');
+        });
+      }
+      toast('Agent updated', 'success');
+      navigate('admin-agent-detail', { id });
+      break;
+    }
+    case 'admin-reset-agent-password': {
+      const id = el.dataset.id;
+      const newPw = (document.getElementById('ea-newPassword') || {}).value || '';
+      const errBox = document.getElementById('ea-pw-error');
+      if (errBox) errBox.textContent = '';
+      const A = window.PXDynastyAuth;
+      if (!A || !A.resetAgentPassword) { toast('Auth module not loaded', 'error'); break; }
+      if (!newPw || newPw.length < 6) {
+        if (errBox) errBox.textContent = 'Password must be at least 6 characters.';
+        break;
+      }
+      A.resetAgentPassword(id, newPw).then((res) => {
+        if (!res.ok) {
+          if (errBox) errBox.textContent = res.error;
+          toast(res.error, 'error');
+          return;
+        }
+        toast('Password reset for ' + res.email, 'success');
+        const elIn = document.getElementById('ea-newPassword'); if (elIn) elIn.value = '';
+      });
       break;
     }
     case 'admin-reset-password': {

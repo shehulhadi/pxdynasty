@@ -317,6 +317,29 @@ async function authCreateStaffAccount(opts) {
   return { ok: true, user: userRowToApp(ins.user) };
 }
 
+/* Admin-only: update a user account (used for agent + business). */
+async function authUpdateUserForRole(role, refId, patch) {
+  if (!role || !refId) return { ok: false, error: 'Missing role or id.' };
+  const s = window.supabase && window.supabase.createClient(
+    'https://ocsglgkombwwpamdijes.supabase.co',
+    'sb_publishable_6HHZQ1MoXmpvi45SD2k9fw_Rj_c3gGB'
+  );
+  if (!s) return { ok: false, error: 'Supabase SDK not loaded' };
+  const col = role === 'business' ? 'business_id' : role === 'agent' ? 'agent_id' : null;
+  if (!col) return { ok: false, error: 'Unsupported role.' };
+  const { data: found, error: findErr } = await s.from('users')
+    .select('id,email').eq(col, refId).eq('role', role).limit(1);
+  if (findErr) return { ok: false, error: findErr.message };
+  if (!found || !found.length) return { ok: false, error: 'No ' + role + ' login found.' };
+  const { error: updErr } = await s.from('users').update(patch).eq('id', found[0].id);
+  if (updErr) return { ok: false, error: updErr.message };
+  return { ok: true, email: found[0].email };
+}
+
+async function authResetAgentPassword(agentId, newPassword) {
+  return authUpdateUserForRole('agent', agentId, { password: newPassword });
+}
+
 /* Admin-only: change the password of the user account tied to a business. */
 async function authResetBusinessOwnerPassword(businessId, newPassword) {
   if (!businessId) return { ok: false, error: 'No business id.' };
@@ -603,4 +626,5 @@ window.PXDynastyAuth = {
   createStaffAccount: authCreateStaffAccount,
   listStaff: authListStaffForCurrentBusiness,
   resetBusinessOwnerPassword: authResetBusinessOwnerPassword,
+  resetAgentPassword: authResetAgentPassword,
 };
