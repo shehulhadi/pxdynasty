@@ -540,8 +540,15 @@ const BUSINESS_NAV = [
   { id: 'biz-earnings', label: 'Earnings', icon: 'wallet' },
   { id: 'biz-analytics', label: 'Analytics', icon: 'chart' },
   { id: 'biz-store', label: 'Store', icon: 'store' },
+  { id: 'biz-team', label: 'Team', icon: 'users' },
   { id: 'biz-settings', label: 'Settings', icon: 'cog' },
 ];
+const STAFF_NAV = [
+  { id: 'biz-orders', label: 'Orders', icon: 'orders' },
+  { id: 'biz-products', label: 'Products', icon: 'box' },
+  { id: 'biz-add-product', label: 'Add product', icon: 'plus' },
+];
+
 const ADMIN_NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'home' },
   { id: 'admin-businesses', label: 'Businesses', icon: 'store' },
@@ -565,13 +572,20 @@ function renderBottomNav() {
     : (state.role === 'agent')
       ? AGENT_TABS
       : (state.role === 'business')
-        ? [
-            { id: 'overview', label: 'Overview', icon: 'home' },
-            { id: 'biz-orders', label: 'Orders', icon: 'orders' },
-            { id: 'biz-products', label: 'Products', icon: 'box' },
-            { id: 'biz-earnings', label: 'Earnings', icon: 'wallet' },
-            { id: '__more', label: 'More', icon: 'menu' },
-          ]
+        ? (state.isStaff
+          ? [
+              { id: 'biz-orders', label: 'Orders', icon: 'orders' },
+              { id: 'biz-products', label: 'Products', icon: 'box' },
+              { id: 'biz-add-product', label: 'Add', icon: 'plus' },
+              { id: '__more', label: 'More', icon: 'menu' },
+            ]
+          : [
+              { id: 'overview', label: 'Overview', icon: 'home' },
+              { id: 'biz-orders', label: 'Orders', icon: 'orders' },
+              { id: 'biz-products', label: 'Products', icon: 'box' },
+              { id: 'biz-earnings', label: 'Earnings', icon: 'wallet' },
+              { id: '__more', label: 'More', icon: 'menu' },
+            ])
         : (state.role === 'admin')
           ? [
               { id: 'dashboard', label: 'Home', icon: 'home' },
@@ -617,7 +631,9 @@ function openMoreMenu() {
 
 function renderSidebar() {
   if (state.role !== 'business' && state.role !== 'admin') return '';
-  const nav = state.role === 'business' ? BUSINESS_NAV : ADMIN_NAV;
+  const nav = state.role === 'admin'
+    ? ADMIN_NAV
+    : (state.isStaff ? STAFF_NAV : BUSINESS_NAV);
   return `<aside class="sidebar has-sidebar">
     ${nav.map((n) => `
       <a href="javascript:void(0)" class="sidebar-link ${state.view === n.id ? 'active' : ''}" data-action="nav" data-view="${n.id}">
@@ -638,6 +654,9 @@ function render() {
   main.classList.toggle('has-sidebar-pad', state.role === 'business' || state.role === 'admin');
   main.innerHTML = `<div class="content-wrap">${renderView()}</div>`;
   bindHeaderSearch();
+  if (state.role === 'business' && state.view === 'biz-team') {
+    loadStaffList();
+  }
 }
 
 function renderView() {
@@ -1257,9 +1276,16 @@ function notificationsView() {
    11. BUSINESS DASHBOARD VIEWS
    ========================================================================== */
 
+const STAFF_ALLOWED_VIEWS = new Set([
+  'biz-orders', 'biz-order-detail', 'biz-products', 'biz-add-product', 'notifications'
+]);
+
 function renderBusinessView() {
   const biz = getBusiness(state.currentBusinessId);
-  if (!biz) return emptyState('store', 'No business', 'No business is currently signed in.', `<button class="btn btn-primary btn-sm" data-action="switch-role" data-role="admin">Go to admin</button>`);
+  if (!biz) return emptyState('store', 'No business', 'No business is currently signed in.', null);
+  if (state.isStaff && !STAFF_ALLOWED_VIEWS.has(state.view)) {
+    return emptyState('shield', 'Not available to staff', 'Ask the business owner for access to this section.', `<button class="btn btn-primary btn-sm" data-action="nav" data-view="biz-orders">Go to Orders</button>`);
+  }
   switch (state.view) {
     case 'overview': return businessOverview(biz);
     case 'biz-orders': return businessOrders(biz);
@@ -1273,6 +1299,7 @@ function renderBusinessView() {
     case 'biz-analytics': return businessAnalytics(biz);
     case 'biz-store': return businessStoreProfile(biz);
     case 'biz-settings': return businessSettings(biz);
+    case 'biz-team': return businessTeam(biz);
     case 'notifications': return notificationsView();
     default: return businessOverview(biz);
   }
@@ -2172,6 +2199,51 @@ function adminAgentNew() {
   `;
 }
 
+function businessTeam(biz) {
+  return `
+    <div class="page-head"><h1>Team</h1><div class="sub">Staff accounts for ${escapeHtml(biz.name)}</div></div>
+    <div class="card">
+      <strong style="font-size:13px;">Add a staff member</strong>
+      <p class="text-sm text-muted mt-8">Staff can add products and process orders. They cannot see earnings, settings, customers, or delete products.</p>
+      <div class="form-row mt-12">
+        <div class="form-group"><label>Full name</label><input type="text" id="st-name" placeholder="e.g. Fatima Umar" /></div>
+        <div class="form-group"><label>Phone (optional)</label><input type="tel" id="st-phone" placeholder="080…" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Email</label><input type="email" id="st-email" placeholder="staff@example.com" /></div>
+        <div class="form-group"><label>Password (min 6 chars)</label><input type="text" id="st-password" placeholder="e.g. staff-2026" /></div>
+      </div>
+      <div class="auth-error" id="st-error" style="margin:6px 0 0;"></div>
+      <button class="btn btn-primary btn-block mt-12" data-action="biz-create-staff">Create staff account</button>
+    </div>
+    <div class="section-title-row"><h2>Staff members</h2></div>
+    <div class="row-cards" id="st-list">
+      <div class="text-sm text-muted">Loading…</div>
+    </div>
+  `;
+}
+
+async function loadStaffList() {
+  const wrap = document.getElementById('st-list');
+  if (!wrap) return;
+  const A = window.PXDynastyAuth;
+  if (!A || !A.listStaff) { wrap.innerHTML = '<div class="text-sm text-muted">Auth module not ready.</div>'; return; }
+  const staff = await A.listStaff();
+  if (!staff.length) {
+    wrap.innerHTML = '<div class="text-sm text-muted">No staff accounts yet.</div>';
+    return;
+  }
+  wrap.innerHTML = staff.map((u) => `
+    <div class="row-card flex items-center justify-between">
+      <div>
+        <div style="font-weight:700;font-size:13.5px;">${escapeHtml(u.name || '(no name)')}</div>
+        <div class="text-sm text-muted">${escapeHtml(u.email)}</div>
+      </div>
+      <span class="status-badge status-accent">Staff</span>
+    </div>
+  `).join('');
+}
+
 /* ==========================================================================
    14. EVENT DELEGATION
    ========================================================================== */
@@ -2364,6 +2436,31 @@ function handleAction(el, ev) {
     }
     case 'admin-process-settlement': { createSettlement(el.dataset.id); render(); toast('Settlement processed', 'success'); break; }
 
+    case 'biz-create-staff': {
+      const A = window.PXDynastyAuth;
+      if (!A || !A.createStaffAccount) { toast('Auth module not loaded', 'error'); break; }
+      const errEl0 = document.getElementById('st-error'); if (errEl0) errEl0.textContent = 'Creating…';
+      A.createStaffAccount({
+        name:     (document.getElementById('st-name') || {}).value || '',
+        phone:    (document.getElementById('st-phone') || {}).value || '',
+        email:    (document.getElementById('st-email') || {}).value || '',
+        password: (document.getElementById('st-password') || {}).value || '',
+      }).then((res) => {
+        if (!res.ok) {
+          const errEl = document.getElementById('st-error'); if (errEl) errEl.textContent = res.error;
+          toast(res.error, 'error');
+          return;
+        }
+        toast('Staff account created: ' + res.user.email, 'success');
+        const errEl = document.getElementById('st-error'); if (errEl) errEl.textContent = '';
+        document.getElementById('st-name').value = '';
+        document.getElementById('st-phone').value = '';
+        document.getElementById('st-email').value = '';
+        document.getElementById('st-password').value = '';
+        loadStaffList();
+      });
+      break;
+    }
     case 'open-more-menu': openMoreMenu(); break;
     case 'more-nav': closeModal(); navigate(el.dataset.view); break;
     case 'do-logout':

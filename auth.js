@@ -200,6 +200,12 @@ async function authApplySessionToApp() {
     appState.role = 'business';
     appState.view = 'overview';
     appState.currentBusinessId = user.businessId || null;
+    appState.isStaff = false;
+  } else if (user.role === 'staff') {
+    appState.role = 'business';
+    appState.view = 'biz-orders';
+    appState.currentBusinessId = user.businessId || null;
+    appState.isStaff = true;
   } else if (user.role === 'agent') {
     appState.role = 'agent';
     appState.view = 'jobs';
@@ -273,6 +279,58 @@ async function authCreateBusinessAccount(opts) {
   if (!ins.ok) return { ok: false, error: 'User insert failed: ' + ins.error };
 
   return { ok: true, user: userRowToApp(ins.user), business: bizRecord };
+}
+
+/* Create a staff user tied to the currently signed-in business owner.
+   Only a business-role user can call this. */
+async function authCreateStaffAccount(opts) {
+  opts = opts || {};
+  const email = String(opts.email || '').trim().toLowerCase();
+  const password = String(opts.password || '');
+  const name = String(opts.name || '').trim();
+
+  if (!email || !email.includes('@')) return { ok: false, error: 'Enter a valid email.' };
+  if (password.length < 6) return { ok: false, error: 'Password must be at least 6 characters.' };
+  if (!name) return { ok: false, error: 'Enter a name.' };
+
+  // The caller must be a business owner and know their business id.
+  const caller = _currentUserCache;
+  if (!caller || caller.role !== 'business') {
+    return { ok: false, error: 'Only a business owner can create staff accounts.' };
+  }
+  const businessId = caller.businessId;
+  if (!businessId) return { ok: false, error: 'No business attached to your account.' };
+
+  const existing = await usersGetByEmail(email);
+  if (existing) return { ok: false, error: 'An account with that email already exists.' };
+
+  const userId = 'u-' + Math.random().toString(36).slice(2, 10);
+  const userRow = {
+    id: userId,
+    email, password, name,
+    role: 'staff',
+    business_id: businessId,
+  };
+  const ins = await usersInsert(userRow);
+  if (!ins.ok) return { ok: false, error: 'Staff insert failed: ' + ins.error };
+
+  return { ok: true, user: userRowToApp(ins.user) };
+}
+
+async function authListStaffForCurrentBusiness() {
+  const caller = _currentUserCache;
+  if (!caller || caller.role !== 'business' || !caller.businessId) return [];
+  const s = window.supabase && window.supabase.createClient(
+    'https://ocsglgkombwwpamdijes.supabase.co',
+    'sb_publishable_6HHZQ1MoXmpvi45SD2k9fw_Rj_c3gGB'
+  );
+  if (!s) return [];
+  const { data, error } = await s.from('users')
+    .select('*')
+    .eq('role', 'staff')
+    .eq('business_id', caller.businessId);
+  if (error) { console.error('listStaff', error); return []; }
+  return (data || []).map(userRowToApp);
 }
 
 async function authCreateAgentAccount(opts) {
@@ -515,4 +573,6 @@ window.PXDynastyAuth = {
   renderAuthGate,
   createBusinessAccount: authCreateBusinessAccount,
   createAgentAccount: authCreateAgentAccount,
+  createStaffAccount: authCreateStaffAccount,
+  listStaff: authListStaffForCurrentBusiness,
 };
