@@ -49,6 +49,7 @@ const ICONS = {
   receipt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5h12v19l-2.5-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21.5v-19Z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>',
   gavel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 6.5 3 3M4 20h9M9.5 4l6 6-7 7-6-6 7-7Z"/></svg>',
   navArrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 18-8-4-8 4 8-18Z"/></svg>',
+  menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>',
 };
 
 /* ==========================================================================
@@ -558,17 +559,60 @@ const ADMIN_NAV = [
 ];
 
 function renderBottomNav() {
-  if (state.role === 'business' || state.role === 'admin') return '';
-  const tabs = state.role === 'customer' ? CUSTOMER_TABS : AGENT_TABS;
   const cartCount = state.cart.reduce((s, l) => s + l.qty, 0);
+  const tabs = (state.role === 'customer')
+    ? CUSTOMER_TABS
+    : (state.role === 'agent')
+      ? AGENT_TABS
+      : (state.role === 'business')
+        ? [
+            { id: 'overview', label: 'Overview', icon: 'home' },
+            { id: 'biz-orders', label: 'Orders', icon: 'orders' },
+            { id: 'biz-products', label: 'Products', icon: 'box' },
+            { id: 'biz-earnings', label: 'Earnings', icon: 'wallet' },
+            { id: '__more', label: 'More', icon: 'menu' },
+          ]
+        : (state.role === 'admin')
+          ? [
+              { id: 'dashboard', label: 'Home', icon: 'home' },
+              { id: 'admin-businesses', label: 'Businesses', icon: 'store' },
+              { id: 'admin-orders', label: 'Orders', icon: 'orders' },
+              { id: 'admin-payments', label: 'Payments', icon: 'card' },
+              { id: '__more', label: 'More', icon: 'menu' },
+            ]
+          : [];
+
+  if (!tabs.length) return '';
   return `<nav class="bottom-nav desktop-hide">
     ${tabs.map((t) => `
-      <button class="bottom-nav-item ${state.view === t.id ? 'active' : ''}" data-action="nav" data-view="${t.id}">
+      <button class="bottom-nav-item ${state.view === t.id ? 'active' : ''}" data-action="${t.id === '__more' ? 'open-more-menu' : 'nav'}" data-view="${t.id}">
         ${ICONS[t.icon]}
         ${t.id === 'cart' && cartCount ? `<span class="cart-count">${cartCount}</span>` : ''}
         <span>${t.label}</span>
       </button>`).join('')}
   </nav>`;
+}
+
+/* Sheet that opens from the "More" tab for business/admin roles. */
+function openMoreMenu() {
+  const nav = state.role === 'business' ? BUSINESS_NAV : state.role === 'admin' ? ADMIN_NAV : [];
+  const itemsHtml = nav.map((n) => `
+    <button class="row-card pressable" style="display:block;width:100%;text-align:left;cursor:pointer;margin-bottom:8px;border:1px solid var(--color-border);"
+      data-action="more-nav" data-view="${n.id}">
+      <div class="flex items-center gap-10" style="padding:2px 4px;">
+        ${ICONS[n.icon]}
+        <span style="font-weight:600;font-size:14px;">${n.label}</span>
+      </div>
+    </button>
+  `).join('');
+  openModal(`
+    <div class="modal-head">
+      <h3>Menu</h3>
+      <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
+    </div>
+    ${itemsHtml}
+    <button class="btn btn-outline btn-block mt-12" data-action="do-logout">Log out</button>
+  `);
 }
 
 function renderSidebar() {
@@ -2320,6 +2364,12 @@ function handleAction(el, ev) {
     }
     case 'admin-process-settlement': { createSettlement(el.dataset.id); render(); toast('Settlement processed', 'success'); break; }
 
+    case 'open-more-menu': openMoreMenu(); break;
+    case 'more-nav': closeModal(); navigate(el.dataset.view); break;
+    case 'do-logout':
+      closeModal();
+      if (window.PXDynastyAuth && window.PXDynastyAuth.logout) window.PXDynastyAuth.logout();
+      break;
     case 'toast-info': toast(el.dataset.msg, 'info'); break;
     case 'toast-success': toast(el.dataset.msg, 'success'); break;
     case 'close-modal': closeModal(); break;
