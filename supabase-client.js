@@ -88,6 +88,8 @@ function sbcRowToOrder(r) {
     disputeReason: r.dispute_reason || null,
     disputeDetails: r.dispute_details || null,
     disputeAt: r.dispute_at || null,
+    paymentReference: r.payment_reference || null,
+    paymentVerifiedAt: r.payment_verified_at || null,
     createdAt: r.created_at,
   };
 }
@@ -154,6 +156,8 @@ function sbcOrderToRow(o) {
     dispute_reason: o.disputeReason || null,
     dispute_details: o.disputeDetails || null,
     dispute_at: o.disputeAt || null,
+    payment_reference: o.paymentReference || null,
+    payment_verified_at: o.paymentVerifiedAt || null,
   };
 }
 function sbcCustomerToRow(c) {
@@ -270,6 +274,30 @@ function sbcNotificationToRow(n) {
   };
 }
 
+/* Call the Supabase Edge Function that verifies a Paystack payment.
+   Returns { ok: true, order } | { ok: false, error } | { ok: true, already_processed: true, order } */
+async function sbcVerifyPayment(reference, orderDraft) {
+  const url = SUPABASE_URL + '/functions/v1/verify-payment';
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+      },
+      body: JSON.stringify({ reference, orderDraft }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok) {
+      return { ok: false, error: data.error || ('HTTP ' + r.status), detail: data.detail };
+    }
+    return data;
+  } catch (e) {
+    return { ok: false, error: 'Network error: ' + String(e) };
+  }
+}
+
 /* Expose globally for app.js to call. */
 window.PXDynastySBC = {
   init: sbcInit,
@@ -283,4 +311,5 @@ window.PXDynastySBC = {
   deleteProduct:  (id) => sbcDelete('products', id),
   uploadProductImage: sbcUploadProductImage,
   upsertNotification: (n) => sbcUpsert('notifications', sbcNotificationToRow(n)),
+  verifyPayment: sbcVerifyPayment,
 };

@@ -341,6 +341,41 @@ function calculateOrderTotal(cartLines) {
   return { subtotal, deliveryFee: calc.deliveryFee, platformFee: calc.platformFee, total: calc.total };
 }
 
+function buildOrderDraft(data) {
+  const subtotal = data.items.reduce((s, it) => s + it.price * it.qty, 0);
+  const calc = calcOrderFinancials(subtotal, DB.settings);
+  return {
+    id: genId('ord'),
+    orderNumber: genOrderNumber(),
+    customerId: data.customerId,
+    businessId: data.businessId,
+    items: data.items,
+    subtotal,
+    deliveryFee: calc.deliveryFee,
+    platformFee: calc.platformFee,
+    discount: 0,
+    total: calc.total,
+    status: 'placed',
+    paymentStatus: 'paid',
+    agentId: null,
+    deliveryAddress: data.deliveryAddress,
+    deliveryInstructions: data.deliveryInstructions || '',
+    customerName: data.customerName,
+    customerPhone: data.customerPhone,
+    paymentMethod: data.paymentMethod,
+    otp: genOtp(),
+    createdAt: new Date().toISOString(),
+    statusHistory: [{ status: 'placed', time: new Date().toISOString() }],
+    financial: {
+      businessCommission: calc.businessCommission,
+      businessReceives: calc.businessReceives,
+      agentPayment: calc.agentPayment,
+      platformGrossRevenue: calc.platformGrossRevenue,
+    },
+    settled: false,
+  };
+}
+
 function createOrder(data) {
   const subtotal = data.items.reduce((s, it) => s + it.price * it.qty, 0);
   const calc = calcOrderFinancials(subtotal, DB.settings);
@@ -3028,15 +3063,15 @@ async function placeOrderFlow() {
     return;
   }
 
-  // Payment succeeded — create the order.
+  // Payment succeeded at Paystack. Now verify server-side before creating the order.
   if (area) {
     area.innerHTML = `<div class="card mt-12 flex-col items-center" style="text-align:center;padding:26px;">
-      <strong>Payment received</strong>
-      <p class="text-sm text-muted mt-8">Creating your order…</p>
+      <strong>Verifying payment…</strong>
+      <p class="text-sm text-muted mt-8">Almost done. Do not close this screen.</p>
     </div>`;
   }
 
-  const order = createOrder({
+  const draft = buildOrderDraft({
     customerId: state.currentCustomerId,
     businessId: lines[0].product.businessId,
     items: lines.map((l) => ({ productId: l.productId, name: l.product.name, price: l.product.discountPrice || l.product.price, qty: l.qty })),
@@ -3046,17 +3081,36 @@ async function placeOrderFlow() {
     customerPhone: cd.phone,
     paymentMethod: cd.paymentMethod,
   });
-  order.paymentReference = result.reference;
-  order.paymentStatus = 'paid';
-  saveData(DB);
-  if (window.PXDynastySBC && window.PXDynastySBC.upsertOrder) {
-    window.PXDynastySBC.upsertOrder(order).catch(() => {});
+
+  if (!window.PXDynastySBC || !window.PXDynastySBC.verifyPayment) {
+    if (area) area.innerHTML = '';
+    if (payBtn) payBtn.disabled = false;
+    toast('Server verification unavailable. Please contact support with reference ' + result.reference, 'error');
+    return;
   }
+
+  const verify = await window.PXDynastySBC.verifyPayment(result.reference, draft);
+
+  if (!verify.ok) {
+    if (area) area.innerHTML = `<div class="card mt-12" style="text-align:center;padding:22px;border-color:var(--color-error);background:var(--color-error-tint);">
+      <strong style="color:var(--color-error);">Payment could not be verified</strong>
+      <p class="text-sm mt-8" style="color:var(--color-error);margin-bottom:0;">${escapeHtml(verify.error || 'Unknown error')}. Save this reference and contact support: <strong>${escapeHtml(result.reference)}</strong></p>
+    </div>`;
+    toast('Payment verification failed', 'error');
+    return;
+  }
+
+  // Verification succeeded — the Edge Function already inserted the order into Supabase.
+  // Mirror it into the local cache so the customer sees it immediately.
+  draft.paymentReference = result.reference;
+  draft.paymentVerifiedAt = new Date().toISOString();
+  DB.orders.unshift(draft);
+  saveDataLocalOnly();
 
   state.cart = [];
   saveCart();
   state.checkoutData = null;
-  navigate('order-success', { orderId: order.id });
+  navigate('order-success', { orderId: draft.id });
 }
 
 let _pendingProductImageUrl = null;
