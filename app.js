@@ -2957,32 +2957,91 @@ function captureCheckoutStepInputs(step) {
   }
 }
 
-function placeOrderFlow() {
+async function placeOrderFlow() {
   const lines = cartLines();
+  if (!lines.length) return;
+
+  const cd = state.checkoutData;
+  const totals = calculateOrderTotal(lines);
+
+  // We need an email for Paystack. Fall back to the signed-in customer's email.
+  const cust = getCustomer(state.currentCustomerId) || {};
+  const email = (cust.email || '').trim() || (cd && cd.email || '').trim();
+  if (!email) {
+    toast('An email address is required to pay. Add it in your account settings.', 'error');
+    return;
+  }
+
   const area = document.getElementById('payment-processing-area');
-  area.innerHTML = `<div class="card mt-12 flex-col items-center" style="text-align:center;padding:26px;">
-    <div class="skeleton" style="width:44px;height:44px;border-radius:50%;margin-bottom:12px;"></div>
-    <strong>Processing payment...</strong><p class="text-sm text-muted mt-8">Please wait, do not close this screen.</p>
-  </div>`;
   const payBtn = document.querySelector('.sticky-bottom-bar button');
   if (payBtn) payBtn.disabled = true;
-  setTimeout(() => {
-    const cd = state.checkoutData;
-    const order = createOrder({
+  if (area) {
+    area.innerHTML = `<div class="card mt-12 flex-col items-center" style="text-align:center;padding:26px;">
+      <div class="skeleton" style="width:44px;height:44px;border-radius:50%;margin-bottom:12px;"></div>
+      <strong>Opening secure payment…</strong>
+      <p class="text-sm text-muted mt-8">Pay with your card, bank transfer, or USSD. Do not close this screen.</p>
+    </div>`;
+  }
+
+  const Pay = window.PXDynastyPay;
+  if (!Pay || !Pay.ready()) {
+    if (area) area.innerHTML = '';
+    if (payBtn) payBtn.disabled = false;
+    toast('Payment is not available right now — try again in a moment.', 'error');
+    return;
+  }
+
+  const result = await Pay.checkout({
+    email,
+    amountNaira: totals.total,
+    customerName: cd.name,
+    customerPhone: cd.phone,
+    metadata: {
       customerId: state.currentCustomerId,
       businessId: lines[0].product.businessId,
-      items: lines.map((l) => ({ productId: l.productId, name: l.product.name, price: l.product.discountPrice || l.product.price, qty: l.qty })),
-      deliveryAddress: cd.address,
-      deliveryInstructions: cd.instructions,
-      customerName: cd.name,
-      customerPhone: cd.phone,
-      paymentMethod: cd.paymentMethod,
-    });
-    state.cart = [];
-    saveCart();
-    state.checkoutData = null;
-    navigate('order-success', { orderId: order.id });
-  }, 900);
+    },
+  });
+
+  if (!result.ok) {
+    if (area) area.innerHTML = '';
+    if (payBtn) payBtn.disabled = false;
+    if (result.reason === 'cancelled') {
+      toast('Payment cancelled', 'info');
+    } else {
+      toast('Payment failed: ' + (result.message || 'unknown'), 'error');
+    }
+    return;
+  }
+
+  // Payment succeeded — create the order.
+  if (area) {
+    area.innerHTML = `<div class="card mt-12 flex-col items-center" style="text-align:center;padding:26px;">
+      <strong>Payment received</strong>
+      <p class="text-sm text-muted mt-8">Creating your order…</p>
+    </div>`;
+  }
+
+  const order = createOrder({
+    customerId: state.currentCustomerId,
+    businessId: lines[0].product.businessId,
+    items: lines.map((l) => ({ productId: l.productId, name: l.product.name, price: l.product.discountPrice || l.product.price, qty: l.qty })),
+    deliveryAddress: cd.address,
+    deliveryInstructions: cd.instructions,
+    customerName: cd.name,
+    customerPhone: cd.phone,
+    paymentMethod: cd.paymentMethod,
+  });
+  order.paymentReference = result.reference;
+  order.paymentStatus = 'paid';
+  saveData(DB);
+  if (window.PXDynastySBC && window.PXDynastySBC.upsertOrder) {
+    window.PXDynastySBC.upsertOrder(order).catch(() => {});
+  }
+
+  state.cart = [];
+  saveCart();
+  state.checkoutData = null;
+  navigate('order-success', { orderId: order.id });
 }
 
 let _pendingProductImageUrl = null;
