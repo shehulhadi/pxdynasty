@@ -143,6 +143,7 @@ async function hydrateDb() {
   DB.orders = remote.orders;
   DB.customers = remote.customers;
   DB.agents = remote.agents;
+  if (remote.notifications) DB.notifications = remote.notifications;
   // Mirror into local cache too.
   saveDataLocalOnly();
   return true;
@@ -447,13 +448,28 @@ function createSettlement(businessId) {
 }
 
 function pushNotification(role, refId, title, body, icon) {
-  DB.notifications.unshift({ id: genId('notif'), role, refId, title, body, time: new Date().toISOString(), read: false, icon: icon || 'bell' });
+  const n = { id: genId('notif'), role, refId, title, body, time: new Date().toISOString(), read: false, icon: icon || 'bell' };
+  DB.notifications.unshift(n);
+  if (window.PXDynastySBC && window.PXDynastySBC.upsertNotification) {
+    window.PXDynastySBC.upsertNotification(n).catch(() => {});
+  }
 }
 function getNotifications(role, refId) {
   return DB.notifications.filter((n) => n.role === role && (refId == null || n.refId == null || n.refId === refId)).sort((a, b) => new Date(b.time) - new Date(a.time));
 }
 function unreadCount(role, refId) { return getNotifications(role, refId).filter((n) => !n.read).length; }
-function DynastyllRead(role, refId) { getNotifications(role, refId).forEach((n) => (n.read = true)); saveData(DB); }
+function DynastyllRead(role, refId) {
+  const items = getNotifications(role, refId);
+  items.forEach((n) => {
+    if (!n.read) {
+      n.read = true;
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertNotification) {
+        window.PXDynastySBC.upsertNotification(n).catch(() => {});
+      }
+    }
+  });
+  saveDataLocalOnly();
+}
 
 function approveBusiness(id) { const b = getBusiness(id); if (b) { b.status = 'active'; b.verified = true; saveData(DB); } }
 function rejectBusiness(id) { const b = getBusiness(id); if (b) { b.status = 'rejected'; saveData(DB); } }
@@ -1146,20 +1162,67 @@ function customerOrderTracking(orderId) {
   const biz = getBusiness(order.businessId) || { name: 'Business' };
   const agent = order.agentId ? getAgent(order.agentId) : null;
   const cancelled = order.status === 'cancelled';
+  const awaitingConfirm = order.status === 'out_for_delivery';
+  const disputed = !!order.disputed;
   return `
     ${backBtn('Back')}
-    <div class="page-head"><div><h1>Order ${order.orderNumber}</h1><div class="sub">${escapeHtml(biz.name)} · ${formatDate(order.createdAt)}</div></div>${orderStatusBadge(order.status)}</div>
-    ${cancelled ? `<div class="card" style="border-color:var(--color-error);background:var(--color-error-tint);"><strong style="color:var(--color-error);">This order was cancelled.</strong></div>` : ''}
-    ${!cancelled ? `<div class="map-placeholder mt-12">${ICONS.location}<span style="margin-left:6px;">Live map preview — agent location updates in real deployment</span></div>` : ''}
-    ${agent ? `<div class="agent-mini-card mt-12">
-      <div class="avatar">${initials(agent.name)}</div>
-      <div style="flex:1;"><div style="font-weight:700;font-size:14px;">${escapeHtml(agent.name)}</div>
-      <div class="text-sm text-muted">${agent.vehicle} · ⭐ ${agent.rating}</div></div>
-      <button class="icon-btn" style="background:var(--color-primary);color:#fff;" data-action="call-agent">${ICONS.phone}</button>
-    </div>` : ''}
-    <div class="section-title-row"><h2>Order status</h2></div>
-    <div class="card">
-      <div class="timeline">
+    <div class="page-head">
+      <div><h1>Order ${order.orderNumber}</h1><div class="sub">${escapeHtml(biz.name)} · ${formatDate(order.createdAt)}</div></div>
+      ${orderStatusBadge(order.status)}
+    </div>
+
+    ${cancelled ? `<div class="card" style="border-color:var(--color-error);background:var(--color-error-tint);"><strong style="color:var(--color-error);">This order was cancelled.</strong><p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-error);">A refund of ${formatNaira(order.total)} has been processed to your original payment method.</p></div>` : ''}
+
+    ${disputed ? `<div class="card" style="border-color:var(--color-warning);background:var(--color-warning-tint);"><strong style="color:var(--color-warning);">Problem reported</strong><p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-warning);">Our team is reviewing your report. We'll be in touch shortly.</p></div>` : ''}
+
+    ${awaitingConfirm ? `
+      <div class="card" style="border-color:var(--color-accent);background:var(--color-accent-tint);">
+        <strong style="color:var(--color-accent-dark);font-size:15px;">Your order is arriving</strong>
+        <p class="text-sm mt-8" style="margin-bottom:14px;color:var(--color-accent-dark);">The delivery agent is on the way. Once they hand over your items, please confirm receipt here.</p>
+        <div class="flex gap-8">
+          <button class="btn btn-primary btn-block" data-action="customer-confirm-delivery" data-order-id="${order.id}">${ICONS.check} I received my order</button>
+          <button class="btn btn-outline btn-block" data-action="customer-report-problem" data-order-id="${order.id}">Report a problem</button>
+        </div>
+      </div>
+    ` : ''}
+
+    ${!cancelled && !awaitingConfirm ? `<div class="map-placeholder mt-12">${ICONS.location}<span style="margin-left:6px;">Live map preview — agent location updates in real deployment</span></div>` : ''}
+
+    ${agent ? `
+      <div class="card mt-12">
+        <strong style="font-size:13px;">Your delivery agent</strong>
+        <div class="flex items-center gap-12 mt-12">
+          <div class="avatar" style="width:46px;height:46px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:var(--font-display);">${initials(agent.name)}</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:14px;">${escapeHtml(agent.name)}</div>
+            <div class="text-sm text-muted">${escapeHtml(agent.vehicle)}${agent.operatingArea ? ' · ' + escapeHtml(agent.operatingArea) : ''}</div>
+          </div>
+          ${agent.phone ? `<a class="icon-btn" style="background:var(--color-primary);color:#fff;" href="tel:${escapeHtml(agent.phone)}" aria-label="Call agent">${ICONS.phone}</a>` : ''}
+        </div>
+      </div>
+    ` : ''}
+
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Items</strong>
+      <div class="mt-8">
+        ${order.items.map((it) => `<div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}
+      </div>
+      <hr class="divider" />
+      <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(order.subtotal)}</span></div>
+      <div class="summary-row"><span>Delivery fee</span><span class="val">${formatNaira(order.deliveryFee)}</span></div>
+      <div class="summary-row"><span>Platform fee</span><span class="val">${formatNaira(order.platformFee)}</span></div>
+      <div class="summary-row total"><span>Total paid</span><span>${formatNaira(order.total)}</span></div>
+    </div>
+
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Delivering to</strong>
+      <p class="text-sm text-muted mt-8" style="margin-bottom:0;">${escapeHtml(order.customerName || '')}${order.customerPhone ? ' · ' + escapeHtml(order.customerPhone) : ''}<br/>${escapeHtml(order.deliveryAddress)}</p>
+      ${order.deliveryInstructions ? `<p class="text-sm text-faint mt-8" style="margin-bottom:0;">${escapeHtml(order.deliveryInstructions)}</p>` : ''}
+    </div>
+
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Order status</strong>
+      <div class="timeline mt-12">
         ${ORDER_FLOW.map((step, i) => {
           const entry = order.statusHistory.find((h) => h.status === step);
           const done = !!entry;
@@ -1172,6 +1235,7 @@ function customerOrderTracking(orderId) {
         }).join('')}
       </div>
     </div>
+
     <div class="flex gap-10 mt-16">
       <button class="btn btn-outline btn-block" data-action="nav" data-view="customer-order-detail" data-order-id="${order.id}">Order details</button>
       <button class="btn btn-primary btn-block" data-action="contact-support">Contact support</button>
@@ -1708,7 +1772,13 @@ function agentActiveDelivery(agent) {
     <div class="sticky-bottom-bar">
       ${stage === 'agent_assigned' ? `<button class="btn btn-primary btn-block" data-action="agent-confirm-pickup" data-order-id="${active.id}">Confirm pickup from business</button>` : ''}
       ${stage === 'picked_up' ? `<button class="btn btn-primary btn-block" data-action="agent-start-transit" data-order-id="${active.id}">Start delivery to customer</button>` : ''}
-      ${stage === 'out_for_delivery' ? `<button class="btn btn-primary btn-block" data-action="agent-open-otp" data-order-id="${active.id}">Confirm delivery</button>` : ''}
+      ${stage === 'out_for_delivery' ? `
+        <div class="card" style="background:var(--color-accent-tint);border-color:var(--color-accent);margin-bottom:10px;">
+          <strong style="font-size:13px;color:var(--color-accent-dark);">Waiting for customer confirmation</strong>
+          <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-accent-dark);">The customer confirms receipt from their own app once you hand over the order. You'll see the order complete automatically.</p>
+        </div>
+        <button class="btn btn-outline btn-block" data-action="agent-force-delivered" data-order-id="${active.id}">Customer not available — mark delivered</button>
+      ` : ''}
     </div>
   `;
 }
@@ -2566,6 +2636,76 @@ function handleAction(el, ev) {
     case 'agent-confirm-pickup': updateOrderStatus(el.dataset.orderId, 'picked_up'); render(); toast('Pickup confirmed', 'success'); break;
     case 'agent-start-transit': updateOrderStatus(el.dataset.orderId, 'out_for_delivery'); render(); toast('On the way to customer', 'success'); break;
     case 'agent-open-otp': openOtpModal(el.dataset.orderId); break;
+    case 'agent-force-delivered': {
+      const id = el.dataset.orderId;
+      confirmDialog(
+        'Mark as delivered?',
+        'Only do this if you have actually handed the order to the customer. The customer will not be able to confirm themselves after this.',
+        'Yes, mark delivered',
+        () => {
+          updateOrderStatus(id, 'delivered');
+          render();
+          toast('Order marked delivered', 'success');
+        }
+      );
+      break;
+    }
+    case 'customer-confirm-delivery': {
+      const id = el.dataset.orderId;
+      const order = getOrder(id);
+      if (!order) break;
+      confirmDialog(
+        'Confirm you received your order?',
+        'Only confirm if the items have been handed to you. This completes the delivery.',
+        'Yes, I received my order',
+        () => {
+          updateOrderStatus(id, 'delivered');
+          render();
+          toast('Thanks for confirming — enjoy your order!', 'success');
+        }
+      );
+      break;
+    }
+    case 'customer-report-problem': {
+      const id = el.dataset.orderId;
+      openModal(`
+        <div class="modal-head"><h3>Report a problem</h3><button class="icon-btn" data-action="close-modal">${ICONS.x}</button></div>
+        <p class="text-sm text-muted">Tell us what went wrong and our team will follow up.</p>
+        <div class="form-group mt-12"><label>What happened?</label>
+          <select id="rp-reason">
+            <option value="not_delivered">I did not receive my order</option>
+            <option value="wrong_items">Wrong or missing items</option>
+            <option value="damaged">Items arrived damaged</option>
+            <option value="other">Something else</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Details (optional)</label><textarea id="rp-details" placeholder="Add any notes about the issue…"></textarea></div>
+        <button class="btn btn-primary btn-block" data-action="customer-submit-report" data-order-id="${id}">Submit report</button>
+      `);
+      break;
+    }
+    case 'customer-submit-report': {
+      const id = el.dataset.orderId;
+      const reason = (document.getElementById('rp-reason') || {}).value || 'other';
+      const details = (document.getElementById('rp-details') || {}).value || '';
+      const order = getOrder(id);
+      if (order) {
+        order.disputed = true;
+        order.disputeReason = reason;
+        order.disputeDetails = details;
+        order.disputeAt = new Date().toISOString();
+        pushNotification('admin', null, 'New dispute', `Order ${order.orderNumber}: ${reason}`, 'gavel');
+        pushNotification('business', order.businessId, 'Dispute opened', `Customer reported: ${reason}`, 'gavel');
+        saveData(DB);
+        if (window.PXDynastySBC && window.PXDynastySBC.upsertOrder) {
+          window.PXDynastySBC.upsertOrder(order).catch(() => {});
+        }
+      }
+      closeModal();
+      toast('Report submitted — support will follow up', 'success');
+      render();
+      break;
+    }
 
     case 'admin-biz-filter': navigate('admin-businesses', { status: el.dataset.status }); break;
     case 'admin-approve-biz': approveBusiness(el.dataset.id); render(); toast('Business approved', 'success'); break;

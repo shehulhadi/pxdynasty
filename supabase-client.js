@@ -84,6 +84,10 @@ function sbcRowToOrder(r) {
     financial: r.financial,
     statusHistory: r.status_history,
     settled: r.settled,
+    disputed: r.disputed || false,
+    disputeReason: r.dispute_reason || null,
+    disputeDetails: r.dispute_details || null,
+    disputeAt: r.dispute_at || null,
     createdAt: r.created_at,
   };
 }
@@ -146,6 +150,10 @@ function sbcOrderToRow(o) {
     customer_name: o.customerName, customer_phone: o.customerPhone,
     payment_method: o.paymentMethod, otp: o.otp,
     financial: o.financial, status_history: o.statusHistory, settled: o.settled,
+    disputed: !!o.disputed,
+    dispute_reason: o.disputeReason || null,
+    dispute_details: o.disputeDetails || null,
+    dispute_at: o.disputeAt || null,
   };
 }
 function sbcCustomerToRow(c) {
@@ -169,12 +177,13 @@ async function sbcFetchAll() {
   const c = sbcInit();
   if (!c) return null;
   try {
-    const [bizR, prodR, ordR, custR, agentR] = await Promise.all([
+    const [bizR, prodR, ordR, custR, agentR, notifR] = await Promise.all([
       c.from('businesses').select('*'),
       c.from('products').select('*'),
       c.from('orders').select('*'),
       c.from('customers').select('*'),
       c.from('agents').select('*'),
+      c.from('notifications').select('*').order('created_at', { ascending: false }).limit(200),
     ]);
     if (bizR.error) throw bizR.error;
     return {
@@ -183,6 +192,7 @@ async function sbcFetchAll() {
       orders: (ordR.data || []).map(sbcRowToOrder),
       customers: (custR.data || []).map(sbcRowToCustomer),
       agents: (agentR.data || []).map(sbcRowToAgent),
+      notifications: notifR.error ? [] : (notifR.data || []).map(sbcRowToNotification),
     };
   } catch (e) {
     console.error('sbcFetchAll failed:', e);
@@ -236,6 +246,30 @@ async function sbcUploadProductImage(file) {
   }
 }
 
+function sbcRowToNotification(r) {
+  return {
+    id: r.id,
+    role: r.role,
+    refId: r.ref_id,
+    title: r.title,
+    body: r.body,
+    icon: r.icon,
+    read: r.read || false,
+    time: r.created_at,
+  };
+}
+function sbcNotificationToRow(n) {
+  return {
+    id: n.id,
+    role: n.role,
+    ref_id: n.refId || null,
+    title: n.title || '',
+    body: n.body || '',
+    icon: n.icon || 'bell',
+    read: !!n.read,
+  };
+}
+
 /* Expose globally for app.js to call. */
 window.PXDynastySBC = {
   init: sbcInit,
@@ -248,4 +282,5 @@ window.PXDynastySBC = {
   deleteBusiness: (id) => sbcDelete('businesses', id),
   deleteProduct:  (id) => sbcDelete('products', id),
   uploadProductImage: sbcUploadProductImage,
+  upsertNotification: (n) => sbcUpsert('notifications', sbcNotificationToRow(n)),
 };
