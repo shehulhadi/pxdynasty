@@ -378,6 +378,12 @@ function createOrder(data) {
   pushNotification('customer', order.customerId, 'Payment successful', `Order ${order.orderNumber} placed. Payment of ${formatNaira(order.total)} confirmed.`, 'checkCircle');
   pushNotification('admin', null, 'New order', `${order.orderNumber} placed.`, 'box');
   saveData(DB);
+  // Push the order + the notification-bearing entities to Supabase right away.
+  if (window.PXDynastySBC && window.PXDynastySBC.upsertOrder) {
+    window.PXDynastySBC.upsertOrder(order).then((r) => {
+      if (!r.ok) console.error('[order sync]', r.error);
+    });
+  }
   return order;
 }
 
@@ -408,6 +414,11 @@ function updateOrderStatus(orderId, status, extra) {
   }
   if (status === 'cancelled') pushNotification('customer', order.customerId, 'Order cancelled', `Order ${order.orderNumber} was cancelled.`, 'errorCircle');
   saveData(DB);
+  if (window.PXDynastySBC && window.PXDynastySBC.upsertOrder) {
+    window.PXDynastySBC.upsertOrder(order).then((r) => {
+      if (!r.ok) console.error('[order update sync]', r.error);
+    });
+  }
   return order;
 }
 
@@ -745,7 +756,7 @@ function productCardHtml(p) {
       <div class="p-name">${escapeHtml(p.name)}</div>
       <div class="rating-row">${ICONS.star} ${p.rating || '—'} <span class="text-faint">· ${p.sales || 0} sold</span></div>
       <div class="price-row"><span class="now">${formatNaira(price)}</span>${p.discountPrice ? `<span class="was">${formatNaira(p.price)}</span>` : ''}</div>
-      <button class="add-cart-fab" ${outOfStock ? 'disabled' : ''} data-action="add-to-cart" data-id="${p.id}" onclick="event.stopPropagation()">${outOfStock ? 'Unavailable' : 'Add to cart'}</button>
+      <button class="add-cart-fab" ${outOfStock ? 'disabled' : ''} data-action="add-to-cart" data-id="${p.id}">${outOfStock ? 'Unavailable' : 'Add to cart'}</button>
     </div>
   </div>`;
 }
@@ -2469,7 +2480,10 @@ function handleAction(el, ev) {
       document.querySelectorAll('[data-action="add-to-cart"], [data-action="buy-now"]').forEach((b) => (b.dataset.qty = next));
       break;
     }
-    case 'add-to-cart': addToCart(el.dataset.id, parseInt(el.dataset.qty || '1', 10)); break;
+    case 'add-to-cart':
+      ev && ev.stopPropagation && ev.stopPropagation();
+      addToCart(el.dataset.id, parseInt(el.dataset.qty || '1', 10));
+      break;
     case 'buy-now': addToCart(el.dataset.id, parseInt(el.dataset.qty || '1', 10)); navigate('cart'); break;
     case 'cart-qty': {
       const line = state.cart.find((l) => l.productId === el.dataset.id);
