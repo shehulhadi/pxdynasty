@@ -1766,19 +1766,34 @@ function agentActiveDelivery(agent) {
         <div><strong style="font-size:13.5px;">${escapeHtml(biz.name)}</strong><div class="text-sm text-muted">${escapeHtml(biz.address)}</div><div class="text-sm text-muted">${escapeHtml(biz.phone)}</div></div>
       </div>
       <div class="flex items-start gap-10 mt-12"><div style="color:var(--color-accent-dark);">${ICONS.location}</div>
-        <div><strong style="font-size:13.5px;">${escapeHtml(cust.name)}</strong><div class="text-sm text-muted">${escapeHtml(active.deliveryAddress)}</div></div>
+        <div><strong style="font-size:13.5px;">${escapeHtml(cust.name)}</strong>${cust.phone ? `<div class="text-sm text-muted">${escapeHtml(cust.phone)}</div>` : ''}<div class="text-sm text-muted">${escapeHtml(active.deliveryAddress)}</div></div>
       </div>
+      ${active.deliveryInstructions ? `<p class="text-sm text-faint mt-8" style="margin-bottom:0;">Instructions: ${escapeHtml(active.deliveryInstructions)}</p>` : ''}
     </div>
+
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Items</strong>
+      <div class="mt-8">${active.items.map((it) => `<div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span></div>`).join('')}</div>
+    </div>
+
+    <div class="flex gap-10 mt-12">
+      ${biz.phone ? `<a class="btn btn-outline btn-block" href="tel:${escapeHtml(biz.phone)}">${ICONS.phone} Call business</a>` : ''}
+      ${cust.phone ? `<a class="btn btn-outline btn-block" href="tel:${escapeHtml(cust.phone)}">${ICONS.phone} Call customer</a>` : ''}
+    </div>
+
+    <div class="map-placeholder mt-12">${ICONS.navArrow}<span style="margin-left:6px;">Navigation preview</span></div>
+
+    ${stage === 'out_for_delivery' ? `
+      <div class="card mt-12" style="background:var(--color-accent-tint);border-color:var(--color-accent);">
+        <strong style="font-size:13px;color:var(--color-accent-dark);">Waiting for customer confirmation</strong>
+        <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-accent-dark);">The customer confirms receipt from their own app once you hand over the order. You'll see the order complete automatically.</p>
+      </div>
+    ` : ''}
+
     <div class="sticky-bottom-bar">
       ${stage === 'agent_assigned' ? `<button class="btn btn-primary btn-block" data-action="agent-confirm-pickup" data-order-id="${active.id}">Confirm pickup from business</button>` : ''}
       ${stage === 'picked_up' ? `<button class="btn btn-primary btn-block" data-action="agent-start-transit" data-order-id="${active.id}">Start delivery to customer</button>` : ''}
-      ${stage === 'out_for_delivery' ? `
-        <div class="card" style="background:var(--color-accent-tint);border-color:var(--color-accent);margin-bottom:10px;">
-          <strong style="font-size:13px;color:var(--color-accent-dark);">Waiting for customer confirmation</strong>
-          <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-accent-dark);">The customer confirms receipt from their own app once you hand over the order. You'll see the order complete automatically.</p>
-        </div>
-        <button class="btn btn-outline btn-block" data-action="agent-force-delivered" data-order-id="${active.id}">Customer not available — mark delivered</button>
-      ` : ''}
+      ${stage === 'out_for_delivery' ? `<button class="btn btn-outline btn-block" data-action="agent-force-delivered" data-order-id="${active.id}">Customer not available — mark delivered</button>` : ''}
     </div>
   `;
 }
