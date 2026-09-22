@@ -1414,17 +1414,40 @@ function businessOrderDetail(orderId) {
           <hr class="divider" />
           <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(order.subtotal)}</span></div>
         </div>
-        <div class="card mt-12"><strong style="font-size:13px;">Customer & delivery</strong>
-          <p class="text-sm text-muted mt-8" style="margin-bottom:0;">${escapeHtml(cust.name)} · ${escapeHtml(cust.phone || '')}<br/>${escapeHtml(order.deliveryAddress)}</p>
+        <div class="card mt-12">
+          <strong style="font-size:13px;">Customer & delivery</strong>
+          <p class="text-sm text-muted mt-8" style="margin-bottom:0;">${escapeHtml(cust.name)}${cust.phone ? ' · ' + escapeHtml(cust.phone) : ''}<br/>${escapeHtml(order.deliveryAddress)}</p>
+          ${order.deliveryInstructions ? `<p class="text-sm text-faint mt-8" style="margin-bottom:0;">Instructions: ${escapeHtml(order.deliveryInstructions)}</p>` : ''}
+          ${cust.phone ? `<div class="flex gap-8 mt-12">
+            <a class="btn btn-outline btn-sm" href="tel:${escapeHtml(cust.phone)}">${ICONS.phone} Call customer</a>
+          </div>` : ''}
         </div>
-        ${agent ? `<div class="card mt-12"><strong style="font-size:13px;">Assigned agent</strong><p class="text-sm text-muted mt-8" style="margin-bottom:0;">${escapeHtml(agent.name)} · ${agent.vehicle}</p></div>` : ''}
+        ${agent ? `
+          <div class="card mt-12">
+            <strong style="font-size:13px;">Assigned agent</strong>
+            <p class="text-sm text-muted mt-8" style="margin-bottom:0;">${escapeHtml(agent.name)} · ${agent.vehicle}${agent.operatingArea ? ' · ' + escapeHtml(agent.operatingArea) : ''}</p>
+            ${agent.phone ? `<div class="flex gap-8 mt-12">
+              <a class="btn btn-outline btn-sm" href="tel:${escapeHtml(agent.phone)}">${ICONS.phone} Call agent</a>
+            </div>` : ''}
+          </div>` : ''}
+        <div class="card mt-12">
+          <strong style="font-size:13px;">Payment</strong>
+          <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(order.subtotal)}</span></div>
+          <div class="summary-row"><span>Delivery fee</span><span class="val">${formatNaira(order.deliveryFee)}</span></div>
+          <div class="summary-row"><span>Platform fee</span><span class="val">${formatNaira(order.platformFee)}</span></div>
+          <div class="summary-row total"><span>Customer paid</span><span>${formatNaira(order.total)}</span></div>
+          <hr class="divider" />
+          <div class="summary-row"><span>Platform commission</span><span class="val">−${formatNaira(order.financial.businessCommission)}</span></div>
+          <div class="summary-row" style="font-weight:700;color:var(--color-text);"><span>You will receive</span><span>${formatNaira(order.financial.businessReceives)}</span></div>
+        </div>
       </div>
       <div>
         <div class="card"><strong style="font-size:13px;">Timeline</strong>
           <div class="timeline mt-12">${order.statusHistory.map((h, i) => `<div class="timeline-step done"><div class="rail"><div class="node">${ICONS.check}</div>${i < order.statusHistory.length - 1 ? '<div class="line"></div>' : ''}</div><div class="content"><div class="t-title">${ORDER_FLOW_LABEL[h.status] || h.status}</div><div class="t-time">${formatDate(h.time)}</div></div></div>`).join('')}</div>
         </div>
         ${nextAction ? `<button class="btn btn-primary btn-block mt-12" data-action="biz-advance-order" data-order-id="${order.id}" data-next="${nextAction}">${BIZ_ORDER_STATUS_ACTION_LABEL[order.status]}</button>` : ''}
-        ${order.status === 'placed' ? `<button class="btn btn-danger btn-block mt-8" data-action="biz-cancel-order" data-order-id="${order.id}">Cancel order</button>` : ''}
+        ${order.status === 'agent_assigned' && !order.agentId ? `<button class="btn btn-outline btn-block mt-8" data-action="biz-request-agent" data-order-id="${order.id}">Request a delivery agent</button>` : ''}
+        ${order.status !== 'cancelled' && order.status !== 'delivered' ? `<button class="btn btn-danger btn-block mt-8" data-action="biz-cancel-order" data-order-id="${order.id}">Cancel order</button>` : ''}
       </div>
     </div>
   `;
