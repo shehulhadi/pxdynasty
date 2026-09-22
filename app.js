@@ -2227,6 +2227,21 @@ function adminBusinessEdit(id) {
       </div>
       <div class="auth-error" id="eb-error" style="margin:6px 0 0;"></div>
     </div>
+
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Reset owner password</strong>
+      <p class="text-sm text-muted mt-8">Use this if the owner has lost access. The new password works immediately — old one stops working.</p>
+      <div class="form-group mt-12">
+        <label>New password (min 6 chars)</label>
+        <div class="flex gap-8">
+          <input type="text" id="eb-newPassword" placeholder="Tap generate →" style="flex:1;" />
+          <button type="button" class="btn btn-outline btn-sm" data-action="gen-password" data-target="eb-newPassword">Generate</button>
+        </div>
+      </div>
+      <div class="auth-error" id="eb-pw-error" style="margin:6px 0 0;"></div>
+      <button class="btn btn-primary btn-block mt-12" data-action="admin-reset-password" data-id="${b.id}">Reset password</button>
+    </div>
+
     <div class="sticky-bottom-bar">
       <button class="btn btn-outline btn-block" data-action="back">Cancel</button>
       <button class="btn btn-primary btn-block" data-action="admin-update-business" data-id="${b.id}">Save changes</button>
@@ -2528,6 +2543,28 @@ function handleAction(el, ev) {
       elIn.focus();
       elIn.select && elIn.select();
       toast('Password generated — long-press the field to copy', 'success');
+      break;
+    }
+    case 'admin-reset-password': {
+      const id = el.dataset.id;
+      const newPw = (document.getElementById('eb-newPassword') || {}).value || '';
+      const errBox = document.getElementById('eb-pw-error');
+      if (errBox) errBox.textContent = '';
+      const A = window.PXDynastyAuth;
+      if (!A || !A.resetBusinessOwnerPassword) { toast('Auth module not loaded', 'error'); break; }
+      if (!newPw || newPw.length < 6) {
+        if (errBox) errBox.textContent = 'Password must be at least 6 characters.';
+        break;
+      }
+      A.resetBusinessOwnerPassword(id, newPw).then((res) => {
+        if (!res.ok) {
+          if (errBox) errBox.textContent = res.error;
+          toast(res.error, 'error');
+          return;
+        }
+        toast('Password reset for ' + res.email, 'success');
+        const elIn = document.getElementById('eb-newPassword'); if (elIn) elIn.value = '';
+      });
       break;
     }
     case 'admin-update-business': {

@@ -317,6 +317,28 @@ async function authCreateStaffAccount(opts) {
   return { ok: true, user: userRowToApp(ins.user) };
 }
 
+/* Admin-only: change the password of the user account tied to a business. */
+async function authResetBusinessOwnerPassword(businessId, newPassword) {
+  if (!businessId) return { ok: false, error: 'No business id.' };
+  if (!newPassword || newPassword.length < 6) return { ok: false, error: 'Password must be at least 6 characters.' };
+  const s = window.supabase && window.supabase.createClient(
+    'https://ocsglgkombwwpamdijes.supabase.co',
+    'sb_publishable_6HHZQ1MoXmpvi45SD2k9fw_Rj_c3gGB'
+  );
+  if (!s) return { ok: false, error: 'Supabase SDK not loaded' };
+  // Find the business-role user linked to this business.
+  const { data: found, error: findErr } = await s.from('users')
+    .select('id,email,role')
+    .eq('business_id', businessId)
+    .eq('role', 'business')
+    .limit(1);
+  if (findErr) return { ok: false, error: findErr.message };
+  if (!found || !found.length) return { ok: false, error: 'No business-owner login found for this business.' };
+  const { error: updErr } = await s.from('users').update({ password: newPassword }).eq('id', found[0].id);
+  if (updErr) return { ok: false, error: updErr.message };
+  return { ok: true, email: found[0].email };
+}
+
 async function authListStaffForCurrentBusiness() {
   const caller = _currentUserCache;
   if (!caller || caller.role !== 'business' || !caller.businessId) return [];
@@ -575,4 +597,5 @@ window.PXDynastyAuth = {
   createAgentAccount: authCreateAgentAccount,
   createStaffAccount: authCreateStaffAccount,
   listStaff: authListStaffForCurrentBusiness,
+  resetBusinessOwnerPassword: authResetBusinessOwnerPassword,
 };
