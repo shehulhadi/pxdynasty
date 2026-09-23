@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PXDynasty — User Manual</title>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --ink-soft: #444;
+    --ink-mute: #6b6b6b;
+    --accent: #0B6E4F;
+    --accent-dark: #084F39;
+    --line: #ddd;
+    --bg-soft: #f6f6f3;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: Georgia, 'Iowan Old Style', serif;
+    color: var(--ink);
+    line-height: 1.55;
+    font-size: 11pt;
+    background: #fff;
+    padding: 30px 40px;
+    max-width: 820px;
+    margin: 0 auto;
+  }
+
+  /* Print styles */
+  @page {
+    size: A4;
+    margin: 18mm 16mm;
+  }
+  @media print {
+    body { padding: 0; max-width: none; font-size: 10.5pt; }
+    h1 { page-break-before: always; }
+    h1:first-of-type, h2.cover-title { page-break-before: avoid; }
+    section { page-break-inside: auto; }
+    .avoid-break { page-break-inside: avoid; }
+    .pagebreak { page-break-before: always; }
+  }
+
+  /* Cover */
+  .cover {
+    text-align: left;
+    padding: 40px 0 30px;
+    border-bottom: 3px solid var(--accent);
+    margin-bottom: 30px;
+  }
+  .cover-eyebrow {
+    font-family: -apple-system, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 10pt;
+    color: var(--accent-dark);
+    font-weight: 700;
+    margin: 0 0 14px;
+  }
+  .cover h1 {
+    font-family: Georgia, serif;
+    font-size: 42pt;
+    line-height: 1.05;
+    margin: 0 0 10px;
+    color: var(--accent-dark);
+    letter-spacing: -0.02em;
+  }
+  .cover p.lede {
+    font-size: 13pt;
+    color: var(--ink-soft);
+    margin: 0 0 26px;
+    max-width: 60ch;
+  }
+  .cover .meta {
+    font-family: -apple-system, sans-serif;
+    font-size: 9.5pt;
+    color: var(--ink-mute);
+  }
+  .cover .meta span { display: inline-block; margin-right: 20px; }
+
+  /* Headings */
+  h1 {
+    font-size: 22pt;
+    color: var(--accent-dark);
+    margin: 40px 0 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+    letter-spacing: -0.01em;
+  }
+  h2 {
+    font-size: 15pt;
+    color: var(--ink);
+    margin: 22px 0 6px;
+  }
+  h3 {
+    font-size: 12pt;
+    color: var(--accent-dark);
+    margin: 16px 0 4px;
+    font-family: -apple-system, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  p { margin: 6px 0 10px; }
+
+  /* Lists */
+  ul, ol { margin: 6px 0 12px; padding-left: 22px; }
+  li { margin: 3px 0; }
+
+  /* Callouts */
+  .callout {
+    background: var(--bg-soft);
+    border-left: 4px solid var(--accent);
+    padding: 12px 16px;
+    margin: 14px 0;
+    border-radius: 4px;
+  }
+  .callout strong {
+    color: var(--accent-dark);
+    display: block;
+    margin-bottom: 4px;
+    font-family: -apple-system, sans-serif;
+    font-size: 9.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 18px;
+    font-size: 10pt;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    background: var(--bg-soft);
+    font-family: -apple-system, sans-serif;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+  }
+
+  /* TOC */
+  .toc { margin: 10px 0 20px; font-family: -apple-system, sans-serif; }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin: 4px 0; font-size: 10.5pt; }
+  .toc a { color: var(--ink); text-decoration: none; }
+
+  /* Inline code */
+  code {
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    background: var(--bg-soft);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+
+  .footer-note {
+    margin-top: 40px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    font-family: -apple-system, sans-serif;
+    font-size: 9pt;
+    color: var(--ink-mute);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <p class="cover-eyebrow">User Manual</p>
+  <h1>PXDynasty</h1>
+  <p class="lede">A local multi-vendor marketplace — customers shop from nearby businesses, pay once, and get delivery. Businesses list products, agents deliver, admin runs the platform.</p>
+  <div class="meta">
+    <span><strong>Version 1.0</strong></span>
+    <span>Web app · shehulhadi.github.io/pxdynasty</span>
+    <span>Operated by Ma'aka Store Businesses</span>
+  </div>
+</div>
+
+<h1>Contents</h1>
+<div class="toc">
+  <ol>
+    <li>What is PXDynasty?</li>
+    <li>The four roles</li>
+    <li>Customer guide</li>
+    <li>Business owner &amp; staff guide</li>
+    <li>Delivery agent guide</li>
+    <li>Admin guide</li>
+    <li>Payments &amp; payouts</li>
+    <li>Order chat &amp; support</li>
+    <li>Troubleshooting &amp; FAQ</li>
+  </ol>
+</div>
+
+<h1>1. What is PXDynasty?</h1>
+
+<p>PXDynasty is a local marketplace web app. Unlike a single-shop store, it lets a customer buy from several businesses at once — one cart, one payment, several separate deliveries.</p>
+
+<p>Every customer payment is verified server-side through Paystack, then split into one order per shop. Each order runs its own independent lifecycle: the business prepares it, a delivery agent picks it up, and the customer confirms receipt.</p>
+
+<h3>What the platform handles</h3>
+<ul>
+  <li><strong>Payments</strong> — processed securely by Paystack. Card details never touch the app.</li>
+  <li><strong>Order routing</strong> — a single payment becomes one order per business, with each business's own delivery fee and platform fee applied.</li>
+  <li><strong>Delivery coordination</strong> — orders appear in a pool, agents claim them, businesses see who's coming.</li>
+  <li><strong>Chat</strong> — four-channel messaging on every order, per-party and per-role.</li>
+  <li><strong>Support</strong> — tickets from any role land in a shared admin inbox.</li>
+</ul>
+
+<div class="callout">
+  <strong>Platform fees are hidden from customers and businesses</strong>
+  Customers see "Delivery &amp; service" as one line. Businesses see their commission and net payout. Only the admin sees the full revenue split.
+</div>
+
+<h1>2. The four roles</h1>
+
+<table>
+  <thead>
+    <tr><th>Role</th><th>Created by</th><th>Can do</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Customer</strong></td>
+      <td>Self-signup</td>
+      <td>Browse, cart, checkout, pay, track, dispute, chat, contact support</td>
+    </tr>
+    <tr>
+      <td><strong>Business owner</strong></td>
+      <td>Admin</td>
+      <td>Add products, fulfil orders, manage team, view earnings, chat</td>
+    </tr>
+    <tr>
+      <td><strong>Business staff</strong></td>
+      <td>Business owner</td>
+      <td>Add products, process orders — no earnings, no settings, no delete</td>
+    </tr>
+    <tr>
+      <td><strong>Delivery agent</strong></td>
+      <td>Admin</td>
+      <td>Claim jobs, pick up, deliver, view earnings, chat</td>
+    </tr>
+    <tr>
+      <td><strong>Admin</strong></td>
+      <td>Platform</td>
+      <td>Create businesses &amp; agents, oversee orders, handle support, manage disputes</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>All roles sign in at the same landing page: <code>shehulhadi.github.io/pxdynasty</code>.</p>
+
+<h1>3. Customer guide</h1>
+
+<h3>Signing up</h3>
+<ol>
+  <li>Open the app. Tap <strong>Create a customer account</strong>.</li>
+  <li>Enter your name, email, and a password of at least six characters.</li>
+  <li>You're in — no email verification needed to start shopping.</li>
+</ol>
+
+<h3>Browsing and adding to cart</h3>
+<ul>
+  <li><strong>Home</strong> shows popular businesses, trending products, and a category strip.</li>
+  <li><strong>Explore</strong> lists every product with a sort and filter bar.</li>
+  <li>Tap <strong>Add to cart</strong> on any product card — you stay on the same screen.</li>
+  <li>The cart badge in the header shows your current item count.</li>
+</ul>
+
+<h3>Cart — one shop or many?</h3>
+<p>If your cart has items from more than one business, the cart shows them grouped by shop, each with its own subtotal and its own delivery fee. You still pay once at the end.</p>
+
+<div class="callout">
+  <strong>Multi-shop carts</strong>
+  Three shops means three deliveries, three delivery fees, but one payment. Each business prepares and sends its own items separately.
+</div>
+
+<h3>Checkout — the five steps</h3>
+<ol>
+  <li><strong>Address</strong> — pick a saved address or add a new one.</li>
+  <li><strong>Details</strong> — name, phone, email (for payment receipt), and any delivery instructions.</li>
+  <li><strong>Summary</strong> — per-shop breakdown, totals, and what you'll pay.</li>
+  <li><strong>Payment</strong> — choose card, bank transfer, wallet, or other cashless. Tap <strong>Pay</strong>.</li>
+  <li><strong>Done</strong> — Paystack popup opens; pay with card, bank, or USSD.</li>
+</ol>
+
+<p>After payment succeeds, the app sends the transaction reference to the server for verification. Only when verified does the order get created. If verification fails, you'll see a reference to share with support.</p>
+
+<h3>Tracking your order</h3>
+<p>Open any order from <strong>Orders</strong> and tap <strong>Track order</strong>. You'll see:</p>
+<ul>
+  <li>A status badge at the top (Order placed → Business confirmed → Preparing → Ready for pickup → Agent assigned → Picked up → Out for delivery → Delivered).</li>
+  <li>If an agent is assigned, their name, vehicle, and a call button.</li>
+  <li>Full items and totals — delivery and service fees combined.</li>
+  <li>A complete timeline of what's happened and when.</li>
+</ul>
+
+<p>When the agent is <strong>out for delivery</strong>, a banner appears with two buttons:</p>
+<ul>
+  <li><strong>I received my order</strong> — completes the delivery and releases the agent's payment.</li>
+  <li><strong>Report a problem</strong> — opens a short form; the order is flagged for support.</li>
+</ul>
+
+<h3>Saved addresses</h3>
+<p>From <strong>Account → Saved addresses</strong>, add, edit, delete, and set a default. The default is pre-selected at checkout.</p>
+
+<h3>Contact support</h3>
+<p>On any order page, tap <strong>Contact support</strong>. Choose a category, describe the issue, and submit. Support replies as a notification and, in urgent cases, may message you directly through the order chat.</p>
+
+<h1>4. Business owner &amp; staff guide</h1>
+
+<h3>Signing in</h3>
+<p>The admin creates your business account and sends you the email and password. Sign in at the same landing page. You land on the <strong>Overview</strong> dashboard.</p>
+
+<h3>Adding products</h3>
+<ol>
+  <li>Tap <strong>Add product</strong> on the Overview, or go to <strong>Products → + Add product</strong>.</li>
+  <li>Tap the dashed image box to upload a photo — it uploads to secure cloud storage.</li>
+  <li>Fill in name, category, SKU, description, price, discount (optional), stock.</li>
+  <li>Set <strong>Status</strong> to <strong>Active</strong> so customers can see it. Draft products are hidden.</li>
+  <li>Tap <strong>Add product</strong>.</li>
+</ol>
+
+<h3>Handling orders</h3>
+<p>Every new order shows in <strong>Orders</strong> under <strong>New</strong>. The flow is:</p>
+<ol>
+  <li><strong>Accept order</strong> → status becomes <em>confirmed</em>.</li>
+  <li><strong>Start preparing</strong> → status becomes <em>preparing</em>.</li>
+  <li><strong>Mark ready for pickup</strong> → status becomes <em>ready for pickup</em>. This is when delivery agents can see it in their pool.</li>
+</ol>
+<p>Once an agent accepts, the order moves to <em>agent assigned</em>. You can call or message the agent directly from the order detail page.</p>
+
+<div class="callout">
+  <strong>You control pickup</strong>
+  Agents can't claim an order until you mark it <em>ready for pickup</em>. No one shows up before the food is packed.
+</div>
+
+<h3>Your Team</h3>
+<p>From <strong>Team</strong>, create staff accounts. Staff can add products and process orders but cannot see earnings, settings, customers, or delete products.</p>
+
+<h3>Earnings and settlement</h3>
+<p>The <strong>Earnings</strong> page shows gross sales, platform commission, net earnings, and available balance. Delivered orders become <em>pending settlement</em> until a payout is requested. When you tap <strong>Request settlement</strong>, the pending amount is transferred to your registered bank account.</p>
+
+<h3>Your Store</h3>
+<p>From <strong>Store</strong>, edit your business name, description, opening hours, contact info, and whether you're currently accepting orders.</p>
+
+<h1>5. Delivery agent guide</h1>
+
+<h3>Signing in</h3>
+<p>The admin creates your agent account and sends you an email and password. Sign in at the same landing page — you land on <strong>Jobs</strong>.</p>
+
+<h3>Going online</h3>
+<p>Tap <strong>Go online</strong> in the top-right. While offline, no job pool is shown. While online, you see every order that businesses have marked <em>ready for pickup</em>.</p>
+
+<h3>Claiming a job</h3>
+<p>Each available job card shows:</p>
+<ul>
+  <li>Order number and your earnings for that delivery</li>
+  <li>Pickup business with address</li>
+  <li>Drop-off address</li>
+  <li>Rough distance and estimated time</li>
+</ul>
+<p>Tap <strong>Accept delivery</strong>. The order is now yours and moves to your <strong>Active</strong> tab.</p>
+
+<h3>Running the delivery</h3>
+<ol>
+  <li><strong>Active</strong> shows your current delivery with a three-stage progress strip: Pickup → On the way → Handoff.</li>
+  <li>Above the address blocks you'll see distance and ETA chips.</li>
+  <li>Call or message the business and customer directly from their cards.</li>
+  <li>Tick items off the <strong>Pickup checklist</strong> as you load them — the state saves and survives a reload.</li>
+  <li>Tap <strong>Confirm pickup from business</strong> when you have the order.</li>
+  <li>Tap <strong>Start delivery to customer</strong> when you set off.</li>
+  <li>On arrival, the customer confirms receipt in their own app. You'll see the order complete automatically.</li>
+</ol>
+
+<h3>If the customer isn't reachable</h3>
+<p>While out for delivery, a <strong>Customer not answering</strong> button appears. Tapping it notifies the customer, the business, and support. The order stays open so you can keep trying.</p>
+
+<h3>Parallel deliveries</h3>
+<p>You can hold more than one active delivery at once. Extra orders stack at the bottom of <strong>Active</strong> under <em>Also assigned to you</em>. Tap <strong>Focus this order</strong> to switch which one is shown at the top.</p>
+
+<h3>Releasing an order</h3>
+<p>If you accepted the wrong job, before pickup you can tap <strong>Release this order back to the pool</strong>. The order returns to the available pool for another agent. You won't be paid for released orders.</p>
+
+<h3>Earnings</h3>
+<p>The <strong>Earnings</strong> tab shows:</p>
+<ul>
+  <li>A green hero card with your pending payout balance</li>
+  <li>Today, this week, lifetime, and paid-out totals</li>
+  <li>A 7-day bar chart with average per delivery</li>
+  <li>Full delivery history — tap any row to see the order summary</li>
+</ul>
+
+<h1>6. Admin guide</h1>
+
+<h3>Creating a business</h3>
+<ol>
+  <li>Sign in as admin. Your dashboard shows GMV, platform revenue, order counts, and active businesses and agents.</li>
+  <li>Tap <strong>Businesses</strong> → <strong>+ Create business</strong>.</li>
+  <li>Fill in the business name, owner name, category, phone, and address.</li>
+  <li>Set the owner's login email and password. Tap <strong>Generate</strong> for a strong human-readable password.</li>
+  <li>Tap <strong>Create business</strong>.</li>
+</ol>
+<p>Share the email and password with the business owner. They sign in on their own phone and change it later from the app.</p>
+
+<h3>Creating a delivery agent</h3>
+<p>Same flow under <strong>Delivery agents</strong> → <strong>+ Create agent</strong>. Enter name, phone, vehicle, area, and login credentials.</p>
+
+<h3>Editing and resetting passwords</h3>
+<ul>
+  <li><strong>Businesses → View</strong> shows details, orders, products, and revenue. Tap <strong>Edit</strong> to change any field, or use the <strong>Reset owner password</strong> section to issue a new password.</li>
+  <li><strong>Delivery agents → View/Edit</strong> works the same way.</li>
+</ul>
+
+<h3>Order management</h3>
+<p><strong>Orders</strong> lists every order with status tabs. Tap any card's header to open the full order summary — items, parties with phone numbers, revenue split, and timeline.</p>
+
+<h3>Force-assigning an agent</h3>
+<p>On any order detail, if no agent has claimed it yet, you can assign one manually from the dropdown. Useful when a delivery is time-critical.</p>
+
+<h3>Support inbox</h3>
+<p><strong>Support</strong> collects tickets opened by customers, businesses, and agents. From here you can:</p>
+<ul>
+  <li>See the category, body, and any linked order</li>
+  <li>Reply to the person who opened it</li>
+  <li>Mark it resolved (they receive a notification)</li>
+  <li>Reopen it later if needed</li>
+</ul>
+
+<h3>Direct channels in chat</h3>
+<p>When you open an order chat as admin, you see seven tabs. Three of them are private channels that only you and one party can see:</p>
+<table>
+  <thead><tr><th>Channel</th><th>Who can see it</th></tr></thead>
+  <tbody>
+    <tr><td>All</td><td>Everyone on the order</td></tr>
+    <tr><td>Cust↔Biz</td><td>Customer and business</td></tr>
+    <tr><td>Cust↔Agent</td><td>Customer and agent</td></tr>
+    <tr><td>Biz↔Agent</td><td>Business and agent</td></tr>
+    <tr><td>→ Customer</td><td>You and the customer only</td></tr>
+    <tr><td>→ Business</td><td>You and the business only</td></tr>
+    <tr><td>→ Agent</td><td>You and the agent only</td></tr>
+  </tbody>
+</table>
+<p>A strip of call buttons also appears at the top of the modal so you can phone any party directly.</p>
+
+<h1>7. Payments &amp; payouts</h1>
+
+<h3>How a customer payment works</h3>
+<ol>
+  <li>The customer taps <strong>Pay</strong> and completes the Paystack popup.</li>
+  <li>The app receives a transaction reference from Paystack.</li>
+  <li>It sends the reference and the order draft to the platform's server.</li>
+  <li>The server asks Paystack directly: was this transaction real, for this amount, in NGN?</li>
+  <li>Only after Paystack confirms does the server insert the order into the database.</li>
+</ol>
+
+<div class="callout">
+  <strong>Nobody can fake a payment</strong>
+  The Paystack secret key never touches the browser. A customer cannot edit the page to mark an order paid — the server checks with Paystack before any order is created.
+</div>
+
+<h3>Multi-vendor payments</h3>
+<p>When a cart contains items from several businesses, the customer still pays once. The server splits the total into one order per business, each with its own delivery fee and platform fee. Each business's order runs independently.</p>
+
+<h3>Business payouts</h3>
+<p>Delivered orders become <em>pending settlement</em>. When the business requests settlement, the net amount (subtotal minus commission) is transferred to their registered bank account.</p>
+
+<h3>Agent payouts</h3>
+<p>Each delivery earns a fixed amount based on the delivery fee. The amount is credited when the customer confirms receipt. Pending earnings are shown on the agent's Earnings tab and paid out on a schedule set by the platform.</p>
+
+<h1>8. Order chat &amp; support</h1>
+
+<h3>Channels and privacy</h3>
+<p>Every order has multiple chat channels, and each role sees only the ones they're part of. The visibility hint under the message box always tells you who can read the current channel.</p>
+
+<h3>Business-side claim</h3>
+<p>If two or more staff work the same business, one of them can <strong>Claim</strong> an order's chat. This locks outgoing messages for other teammates so no two people reply to the same customer. The claimer sees a <strong>Release</strong> button; teammates see "Claimed by [name]" and cannot type.</p>
+<p>Customers, agents, and admin are never locked out by a claim — it only affects other business-side users.</p>
+
+<h3>Escalating to support</h3>
+<p>From any order page, <strong>Contact support</strong> opens a short form. Once submitted, the ticket lands in the admin's Support inbox. Replies are delivered as notifications.</p>
+
+<h1>9. Troubleshooting &amp; FAQ</h1>
+
+<h3>The site doesn't load in Firefox</h3>
+<p>Firefox sometimes treats a typed URL as a Google search. Tap the address bar, delete the text, and paste the URL fresh with no trailing space. Or open a private tab and paste the URL there.</p>
+
+<h3>I see stale content after an update</h3>
+<p>Chrome caches GitHub Pages files for up to ten minutes. Open the site in an Incognito tab, or clear site data at <code>chrome://settings/siteData</code>.</p>
+
+<h3>Payment verification failed</h3>
+<p>You'll see a red box with the reference. Copy the reference and contact support. Common causes are amount mismatch or an expired transaction — Paystack still holds the money and it can be reconciled.</p>
+
+<h3>Agent doesn't see my order</h3>
+<p>Agents only see orders that the business has marked <em>ready for pickup</em>. If the business is still in <em>preparing</em>, no agent can claim it yet.</p>
+
+<h3>I can't reply in a chat</h3>
+<p>If you're business-side and a teammate has claimed the chat, only they can send. Ask them to release it, or if you're the claimer, tap <strong>Release</strong>.</p>
+
+<h3>Product shows as "Not available"</h3>
+<p>Its status is Draft or Out of stock. The business can set it to <strong>Active</strong> and add stock.</p>
+
+<h3>How do I change my password?</h3>
+<p>Ask the admin to reset it from the Businesses or Delivery agents section. Self-service password change is on the roadmap.</p>
+
+<h3>What if a customer and business disagree?</h3>
+<p>The customer taps <strong>Report a problem</strong> on the tracking page. This flags the order for admin review and freezes the settlement until resolved.</p>
+
+<h3>Is my card safe?</h3>
+<p>Yes. PXDynasty never sees or stores card details. All card data is handled entirely by Paystack, a PCI-DSS Level 1 certified payment provider.</p>
+
+<div class="footer-note">
+  PXDynasty User Manual · Version 1.0 · Operated by Ma'aka Store Businesses<br>
+  For support, use the in-app Contact support button or email <strong>hello@pxdynasty.com</strong>
+</div>
+
+</body>
+</html>
