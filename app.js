@@ -1076,14 +1076,13 @@ function customerCart() {
         <div class="mt-8">${g.items.map((l) => cartLineHtml(l)).join('')}</div>
         <hr class="divider" />
         <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(g.subtotal)}</span></div>
-        <div class="summary-row"><span>Delivery from this shop</span><span class="val">${formatNaira(g.deliveryFee)}</span></div>
+        <div class="summary-row"><span>Delivery &amp; service</span><span class="val">${formatNaira(g.deliveryFee + g.platformFee)}</span></div>
       </div>`;
     }).join('')}
     ${state.savedForLater.length ? savedForLaterHtml() : ''}
     <div class="card mt-16">
       <div class="summary-row"><span>Product subtotal</span><span class="val">${formatNaira(totals.subtotal)}</span></div>
-      <div class="summary-row"><span>Delivery fees (${totals.perBusiness.length} shop${totals.perBusiness.length === 1 ? '' : 's'})</span><span class="val">${formatNaira(totals.deliveryFee)}</span></div>
-      <div class="summary-row"><span>Platform/service fees</span><span class="val">${formatNaira(totals.platformFee)}</span></div>
+      <div class="summary-row"><span>Delivery &amp; service (${totals.perBusiness.length} shop${totals.perBusiness.length === 1 ? '' : 's'})</span><span class="val">${formatNaira(totals.deliveryFee + totals.platformFee)}</span></div>
       <div class="form-group mt-12 mb-0"><label>Coupon code</label><div class="flex gap-8"><input type="text" placeholder="Enter coupon code" id="coupon-input" /><button class="btn btn-outline btn-sm" data-action="apply-coupon">Apply</button></div></div>
       <div class="summary-row total"><span>Total</span><span>${formatNaira(totals.total)}</span></div>
     </div>
@@ -1194,8 +1193,7 @@ function customerCheckout() {
         <div class="mt-8">${g.items.map((l) => `<div class="summary-row"><span>${l.qty} × ${escapeHtml(l.product.name)}</span><span class="val">${formatNaira((l.product.discountPrice || l.product.price) * l.qty)}</span></div>`).join('')}</div>
         <hr class="divider" />
         <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(g.subtotal)}</span></div>
-        <div class="summary-row"><span>Delivery</span><span class="val">${formatNaira(g.deliveryFee)}</span></div>
-        <div class="summary-row"><span>Platform fee</span><span class="val">${formatNaira(g.platformFee)}</span></div>
+        <div class="summary-row"><span>Delivery &amp; service</span><span class="val">${formatNaira(g.deliveryFee + g.platformFee)}</span></div>
         <div class="summary-row total" style="font-size:14px;"><span>Shop subtotal</span><span>${formatNaira(g.total)}</span></div>
       </div>`;
     }).join('');
@@ -1207,8 +1205,7 @@ function customerCheckout() {
       ${bizBlocks}
       <div class="card mt-16">
         <div class="summary-row"><span>Product subtotal</span><span class="val">${formatNaira(totals.subtotal)}</span></div>
-        <div class="summary-row"><span>Delivery fees</span><span class="val">${formatNaira(totals.deliveryFee)}</span></div>
-        <div class="summary-row"><span>Platform fees</span><span class="val">${formatNaira(totals.platformFee)}</span></div>
+        <div class="summary-row"><span>Delivery &amp; service</span><span class="val">${formatNaira(totals.deliveryFee + totals.platformFee)}</span></div>
         <div class="summary-row total"><span>Total to pay</span><span>${formatNaira(totals.total)}</span></div>
       </div>
       <div class="card mt-12">
@@ -1324,8 +1321,7 @@ function customerOrderTracking(orderId) {
       </div>
       <hr class="divider" />
       <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(order.subtotal)}</span></div>
-      <div class="summary-row"><span>Delivery fee</span><span class="val">${formatNaira(order.deliveryFee)}</span></div>
-      <div class="summary-row"><span>Platform fee</span><span class="val">${formatNaira(order.platformFee)}</span></div>
+      <div class="summary-row"><span>Delivery &amp; service</span><span class="val">${formatNaira(order.deliveryFee + order.platformFee)}</span></div>
       <div class="summary-row total"><span>Total paid</span><span>${formatNaira(order.total)}</span></div>
     </div>
 
@@ -1408,8 +1404,7 @@ function customerOrderDetail(orderId) {
       <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
       <hr class="divider" />
       <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(order.subtotal)}</span></div>
-      <div class="summary-row"><span>Delivery fee</span><span class="val">${formatNaira(order.deliveryFee)}</span></div>
-      <div class="summary-row"><span>Platform fee</span><span class="val">${formatNaira(order.platformFee)}</span></div>
+      <div class="summary-row"><span>Delivery &amp; service</span><span class="val">${formatNaira(order.deliveryFee + order.platformFee)}</span></div>
       <div class="summary-row total"><span>Total paid</span><span>${formatNaira(order.total)}</span></div>
     </div>
     <div class="card mt-12"><strong style="font-size:13px;">Delivery information</strong>
@@ -1735,9 +1730,6 @@ function businessOrderDetail(orderId) {
         <div class="card mt-12">
           <strong style="font-size:13px;">Payment</strong>
           <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(order.subtotal)}</span></div>
-          <div class="summary-row"><span>Delivery fee</span><span class="val">${formatNaira(order.deliveryFee)}</span></div>
-          <div class="summary-row"><span>Platform fee</span><span class="val">${formatNaira(order.platformFee)}</span></div>
-          <div class="summary-row total"><span>Customer paid</span><span>${formatNaira(order.total)}</span></div>
           <hr class="divider" />
           <div class="summary-row"><span>Platform commission</span><span class="val">−${formatNaira(order.financial.businessCommission)}</span></div>
           <div class="summary-row" style="font-weight:700;color:var(--color-text);"><span>You will receive</span><span>${formatNaira(order.financial.businessReceives)}</span></div>
@@ -3334,15 +3326,55 @@ function openOrderSummary(orderId) {
       <span class="text-sm text-muted">${formatDate(o.createdAt)}</span>
     </div>
 
-    <div class="card" style="background:var(--color-bg);border:none;padding:14px;">
-      <strong style="font-size:13px;">Items</strong>
-      <div class="mt-8">${itemsHtml}</div>
-      <hr class="divider" />
-      <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(o.subtotal)}</span></div>
-      <div class="summary-row"><span>Delivery fee</span><span class="val">${formatNaira(o.deliveryFee)}</span></div>
-      <div class="summary-row"><span>Platform fee</span><span class="val">${formatNaira(o.platformFee)}</span></div>
-      <div class="summary-row total" style="font-size:14px;"><span>Customer paid</span><span>${formatNaira(o.total)}</span></div>
-    </div>
+    ${(() => {
+      const me = currentSenderInfo();
+      const isAdmin = me.role === 'admin';
+      const isBusiness = me.role === 'business' || me.role === 'staff';
+      const isAgent = me.role === 'agent';
+
+      const itemsBlock = `
+        <div class="card" style="background:var(--color-bg);border:none;padding:14px;">
+          <strong style="font-size:13px;">Items</strong>
+          <div class="mt-8">${itemsHtml}</div>
+          <hr class="divider" />
+          <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(o.subtotal)}</span></div>
+          ${isAdmin
+            ? `<div class="summary-row"><span>Delivery fee</span><span class="val">${formatNaira(o.deliveryFee)}</span></div>
+               <div class="summary-row"><span>Platform fee</span><span class="val">${formatNaira(o.platformFee)}</span></div>`
+            : `<div class="summary-row"><span>Delivery &amp; service</span><span class="val">${formatNaira(o.deliveryFee + o.platformFee)}</span></div>`}
+          <div class="summary-row total" style="font-size:14px;"><span>${isAdmin ? 'Customer paid' : 'Total paid'}</span><span>${formatNaira(o.total)}</span></div>
+        </div>`;
+
+      let earningsBlock = '';
+      if (isAdmin) {
+        earningsBlock = `
+          <div class="card mt-12">
+            <strong style="font-size:13px;">Revenue split (admin)</strong>
+            <div class="summary-row mt-8"><span>Business receives</span><span class="val">${formatNaira(o.financial.businessReceives)}</span></div>
+            <div class="summary-row"><span>Agent earns</span><span class="val">${formatNaira(o.financial.agentPayment)}</span></div>
+            <div class="summary-row"><span>Business commission</span><span class="val">${formatNaira(o.financial.businessCommission)}</span></div>
+            <div class="summary-row"><span>Platform fee</span><span class="val">${formatNaira(o.platformFee)}</span></div>
+            <div class="summary-row total"><span>Platform gross revenue</span><span>${formatNaira(o.financial.platformGrossRevenue)}</span></div>
+          </div>`;
+      } else if (isBusiness) {
+        earningsBlock = `
+          <div class="card mt-12">
+            <strong style="font-size:13px;">Your earnings</strong>
+            <div class="summary-row mt-8"><span>Order subtotal</span><span class="val">${formatNaira(o.subtotal)}</span></div>
+            <div class="summary-row"><span>Commission</span><span class="val">−${formatNaira(o.financial.businessCommission)}</span></div>
+            <div class="summary-row total"><span>You receive</span><span>${formatNaira(o.financial.businessReceives)}</span></div>
+          </div>`;
+      } else if (isAgent) {
+        earningsBlock = `
+          <div class="card mt-12" style="background:var(--color-primary-tint);border-color:var(--color-primary);">
+            <div class="flex items-center justify-between">
+              <span class="text-sm" style="color:var(--color-primary-dark);font-weight:700;">You earn from this delivery</span>
+              <strong style="font-size:20px;color:var(--color-primary-dark);">${formatNaira(o.financial.agentPayment)}</strong>
+            </div>
+          </div>`;
+      }
+      return itemsBlock + earningsBlock;
+    })()}
 
     <div class="card mt-12">
       <strong style="font-size:13px;">Parties</strong>
@@ -3354,12 +3386,7 @@ function openOrderSummary(orderId) {
       <div class="summary-row"><span>Drop-off</span><span class="val" style="max-width:60%;text-align:right;">${escapeHtml(o.deliveryAddress)}</span></div>
     </div>
 
-    <div class="card mt-12">
-      <strong style="font-size:13px;">Earnings breakdown</strong>
-      <div class="summary-row mt-8"><span>Business receives</span><span class="val">${formatNaira(o.financial.businessReceives)}</span></div>
-      <div class="summary-row"><span>Agent earns</span><span class="val">${formatNaira(o.financial.agentPayment)}</span></div>
-      <div class="summary-row"><span>Platform earns</span><span class="val">${formatNaira(o.financial.platformGrossRevenue)}</span></div>
-    </div>
+
 
     ${history ? `
       <div class="card mt-12">
