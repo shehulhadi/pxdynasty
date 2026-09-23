@@ -276,8 +276,9 @@ function sbcNotificationToRow(n) {
 
 /* Call the Supabase Edge Function that verifies a Paystack payment.
    Returns { ok: true, order } | { ok: false, error } | { ok: true, already_processed: true, order } */
-async function sbcVerifyPayment(reference, orderDraft) {
+async function sbcVerifyPayment(reference, orderDrafts) {
   const url = SUPABASE_URL + '/functions/v1/dynamic-service';
+  const drafts = Array.isArray(orderDrafts) ? orderDrafts : [orderDrafts];
   try {
     const r = await fetch(url, {
       method: 'POST',
@@ -286,7 +287,7 @@ async function sbcVerifyPayment(reference, orderDraft) {
         'apikey': SUPABASE_KEY,
         'Authorization': 'Bearer ' + SUPABASE_KEY,
       },
-      body: JSON.stringify({ reference, orderDraft }),
+      body: JSON.stringify({ reference, orderDrafts: drafts }),
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok || !data.ok) {

@@ -336,9 +336,39 @@ function calcOrderFinancials(subtotal, settings) {
 }
 
 function calculateOrderTotal(cartLines) {
-  const subtotal = cartLines.reduce((s, l) => s + (l.product.discountPrice || l.product.price) * l.qty, 0);
-  const calc = calcOrderFinancials(subtotal, DB.settings);
-  return { subtotal, deliveryFee: calc.deliveryFee, platformFee: calc.platformFee, total: calc.total };
+  // Group cart lines by business so each gets its own delivery fee and
+  // its own order at checkout.
+  const byBiz = {};
+  cartLines.forEach((l) => {
+    const bid = l.product.businessId;
+    (byBiz[bid] = byBiz[bid] || []).push(l);
+  });
+
+  const perBusiness = Object.keys(byBiz).map((bid) => {
+    const items = byBiz[bid];
+    const subtotal = items.reduce((s, l) => s + (l.product.discountPrice || l.product.price) * l.qty, 0);
+    const calc = calcOrderFinancials(subtotal, DB.settings);
+    return {
+      businessId: bid,
+      items,
+      subtotal,
+      deliveryFee: calc.deliveryFee,
+      platformFee: calc.platformFee,
+      total: calc.total,
+      financial: {
+        businessCommission: calc.businessCommission,
+        businessReceives: calc.businessReceives,
+        agentPayment: calc.agentPayment,
+        platformGrossRevenue: calc.platformGrossRevenue,
+      },
+    };
+  });
+
+  const subtotal = perBusiness.reduce((s, b) => s + b.subtotal, 0);
+  const deliveryFee = perBusiness.reduce((s, b) => s + b.deliveryFee, 0);
+  const platformFee = perBusiness.reduce((s, b) => s + b.platformFee, 0);
+  const total = perBusiness.reduce((s, b) => s + b.total, 0);
+  return { subtotal, deliveryFee, platformFee, total, perBusiness, multiBusiness: perBusiness.length > 1 };
 }
 
 function buildOrderDraft(data) {
@@ -1018,22 +1048,30 @@ function customerCart() {
       ${state.savedForLater.length ? savedForLaterHtml() : ''}`;
   }
   const totals = calculateOrderTotal(lines);
-  const groupedByBiz = {};
-  lines.forEach((l) => { (groupedByBiz[l.product.businessId] = groupedByBiz[l.product.businessId] || []).push(l); });
   return `
-    <div class="page-head"><h1>Your cart</h1><div class="sub">${lines.length} item(s)</div></div>
-    ${Object.keys(groupedByBiz).map((bizId) => {
-      const b = getBusiness(bizId) || { name: 'Business' };
+    <div class="page-head"><h1>Your cart</h1><div class="sub">${lines.length} item(s)${totals.multiBusiness ? ' · from ' + totals.perBusiness.length + ' shops' : ''}</div></div>
+    ${totals.multiBusiness ? `<div class="card mt-0" style="background:var(--color-accent-tint);border-color:var(--color-accent);">
+      <strong style="font-size:13px;color:var(--color-accent-dark);">Multiple shops in your cart</strong>
+      <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-accent-dark);">You'll pay once, but each shop delivers its own items separately.</p>
+    </div>` : ''}
+    ${totals.perBusiness.map((g) => {
+      const b = getBusiness(g.businessId) || { name: 'Business' };
       return `<div class="card mt-12">
-        <strong style="font-size:13px;">${escapeHtml(b.name)}</strong>
-        <div class="mt-8">${groupedByBiz[bizId].map((l) => cartLineHtml(l)).join('')}</div>
+        <div class="flex items-center justify-between">
+          <strong style="font-size:13px;">${escapeHtml(b.name)}</strong>
+          <span class="text-sm text-muted">${g.items.length} item${g.items.length === 1 ? '' : 's'}</span>
+        </div>
+        <div class="mt-8">${g.items.map((l) => cartLineHtml(l)).join('')}</div>
+        <hr class="divider" />
+        <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(g.subtotal)}</span></div>
+        <div class="summary-row"><span>Delivery from this shop</span><span class="val">${formatNaira(g.deliveryFee)}</span></div>
       </div>`;
     }).join('')}
     ${state.savedForLater.length ? savedForLaterHtml() : ''}
     <div class="card mt-16">
-      <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(totals.subtotal)}</span></div>
-      <div class="summary-row"><span>Delivery fee</span><span class="val">${formatNaira(totals.deliveryFee)}</span></div>
-      <div class="summary-row"><span>Platform/service fee</span><span class="val">${formatNaira(totals.platformFee)}</span></div>
+      <div class="summary-row"><span>Product subtotal</span><span class="val">${formatNaira(totals.subtotal)}</span></div>
+      <div class="summary-row"><span>Delivery fees (${totals.perBusiness.length} shop${totals.perBusiness.length === 1 ? '' : 's'})</span><span class="val">${formatNaira(totals.deliveryFee)}</span></div>
+      <div class="summary-row"><span>Platform/service fees</span><span class="val">${formatNaira(totals.platformFee)}</span></div>
       <div class="form-group mt-12 mb-0"><label>Coupon code</label><div class="flex gap-8"><input type="text" placeholder="Enter coupon code" id="coupon-input" /><button class="btn btn-outline btn-sm" data-action="apply-coupon">Apply</button></div></div>
       <div class="summary-row total"><span>Total</span><span>${formatNaira(totals.total)}</span></div>
     </div>
@@ -1125,19 +1163,37 @@ function customerCheckout() {
       <div class="form-group mb-0"><label>Delivery instructions (optional)</label><textarea id="ck-instructions" placeholder="e.g. Call when you arrive at the gate">${escapeHtml(checkoutData.instructions)}</textarea></div>
     </div>`;
   } else if (step === 3) {
-    body = `<div class="card">
-      <strong style="font-size:13px;">Order summary</strong>
-      <div class="mt-8">${lines.map((l) => `<div class="summary-row"><span>${l.qty} × ${escapeHtml(l.product.name)}</span><span class="val">${formatNaira((l.product.discountPrice || l.product.price) * l.qty)}</span></div>`).join('')}</div>
-      <hr class="divider" />
-      <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(totals.subtotal)}</span></div>
-      <div class="summary-row"><span>Delivery fee</span><span class="val">${formatNaira(totals.deliveryFee)}</span></div>
-      <div class="summary-row"><span>Platform fee</span><span class="val">${formatNaira(totals.platformFee)}</span></div>
-      <div class="summary-row total"><span>Total to pay</span><span>${formatNaira(totals.total)}</span></div>
-    </div>
-    <div class="card mt-12">
-      <strong style="font-size:13px;">Deliver to</strong>
-      <p class="text-sm text-muted mt-8" style="margin-bottom:0;">${escapeHtml(checkoutData.name)} · ${escapeHtml(checkoutData.phone)}<br/>${escapeHtml(checkoutData.address)}</p>
-    </div>`;
+    const bizBlocks = totals.perBusiness.map((g) => {
+      const b = getBusiness(g.businessId) || { name: 'Business' };
+      return `<div class="card mt-12">
+        <div class="flex items-center justify-between">
+          <strong style="font-size:13px;">${escapeHtml(b.name)}</strong>
+          <span class="text-sm text-muted">${g.items.length} item${g.items.length === 1 ? '' : 's'}</span>
+        </div>
+        <div class="mt-8">${g.items.map((l) => `<div class="summary-row"><span>${l.qty} × ${escapeHtml(l.product.name)}</span><span class="val">${formatNaira((l.product.discountPrice || l.product.price) * l.qty)}</span></div>`).join('')}</div>
+        <hr class="divider" />
+        <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(g.subtotal)}</span></div>
+        <div class="summary-row"><span>Delivery</span><span class="val">${formatNaira(g.deliveryFee)}</span></div>
+        <div class="summary-row"><span>Platform fee</span><span class="val">${formatNaira(g.platformFee)}</span></div>
+        <div class="summary-row total" style="font-size:14px;"><span>Shop subtotal</span><span>${formatNaira(g.total)}</span></div>
+      </div>`;
+    }).join('');
+    body = `
+      ${totals.multiBusiness ? `<div class="card" style="background:var(--color-accent-tint);border-color:var(--color-accent);">
+        <strong style="font-size:13px;color:var(--color-accent-dark);">${totals.perBusiness.length} separate deliveries</strong>
+        <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-accent-dark);">Each shop packs and sends its items separately. You'll pay once at the end.</p>
+      </div>` : ''}
+      ${bizBlocks}
+      <div class="card mt-16">
+        <div class="summary-row"><span>Product subtotal</span><span class="val">${formatNaira(totals.subtotal)}</span></div>
+        <div class="summary-row"><span>Delivery fees</span><span class="val">${formatNaira(totals.deliveryFee)}</span></div>
+        <div class="summary-row"><span>Platform fees</span><span class="val">${formatNaira(totals.platformFee)}</span></div>
+        <div class="summary-row total"><span>Total to pay</span><span>${formatNaira(totals.total)}</span></div>
+      </div>
+      <div class="card mt-12">
+        <strong style="font-size:13px;">Deliver to</strong>
+        <p class="text-sm text-muted mt-8" style="margin-bottom:0;">${escapeHtml(checkoutData.name)} · ${escapeHtml(checkoutData.phone)}<br/>${escapeHtml(checkoutData.address)}</p>
+      </div>`;
   } else if (step === 4) {
     body = `<div class="card">
       <strong style="font-size:13px;">Select payment method</strong>
@@ -3192,16 +3248,18 @@ async function placeOrderFlow() {
     </div>`;
   }
 
-  const draft = buildOrderDraft({
+  // Build one draft per business (from the checkout totals).
+  const cartTotals = calculateOrderTotal(lines);
+  const drafts = cartTotals.perBusiness.map((g) => buildOrderDraft({
     customerId: state.currentCustomerId,
-    businessId: lines[0].product.businessId,
-    items: lines.map((l) => ({ productId: l.productId, name: l.product.name, price: l.product.discountPrice || l.product.price, qty: l.qty })),
+    businessId: g.businessId,
+    items: g.items.map((l) => ({ productId: l.productId, name: l.product.name, price: l.product.discountPrice || l.product.price, qty: l.qty })),
     deliveryAddress: cd.address,
     deliveryInstructions: cd.instructions,
     customerName: cd.name,
     customerPhone: cd.phone,
     paymentMethod: cd.paymentMethod,
-  });
+  }));
 
   if (!window.PXDynastySBC || !window.PXDynastySBC.verifyPayment) {
     if (area) area.innerHTML = '';
@@ -3210,7 +3268,7 @@ async function placeOrderFlow() {
     return;
   }
 
-  const verify = await window.PXDynastySBC.verifyPayment(result.reference, draft);
+  const verify = await window.PXDynastySBC.verifyPayment(result.reference, drafts);
 
   if (!verify.ok) {
     if (area) area.innerHTML = `<div class="card mt-12" style="text-align:center;padding:22px;border-color:var(--color-error);background:var(--color-error-tint);">
@@ -3221,17 +3279,22 @@ async function placeOrderFlow() {
     return;
   }
 
-  // Verification succeeded — the Edge Function already inserted the order into Supabase.
-  // Mirror it into the local cache so the customer sees it immediately.
-  draft.paymentReference = result.reference;
-  draft.paymentVerifiedAt = new Date().toISOString();
-  DB.orders.unshift(draft);
+  // Verification succeeded — the Edge Function already inserted the orders.
+  // Mirror them into the local cache so the customer sees them immediately.
+  const now = new Date().toISOString();
+  drafts.forEach((d) => {
+    d.paymentReference = result.reference;
+    d.paymentVerifiedAt = now;
+    DB.orders.unshift(d);
+  });
   saveDataLocalOnly();
 
   state.cart = [];
   saveCart();
   state.checkoutData = null;
-  navigate('order-success', { orderId: draft.id });
+
+  // Route to the first order's success page (contains the grand total).
+  navigate('order-success', { orderId: drafts[0].id });
 }
 
 let _pendingProductImageUrl = null;
