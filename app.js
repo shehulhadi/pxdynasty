@@ -465,16 +465,16 @@ function updateOrderStatus(orderId, status, extra) {
   order.status = status;
   order.statusHistory.push({ status, time: new Date().toISOString() });
   if (extra) Object.assign(order, extra);
-  if (status === 'confirmed') pushNotification('customer', order.customerId, 'Order confirmed', 'Your order was accepted.', 'checkCircle');
-  if (status === 'preparing') pushNotification('customer', order.customerId, 'Preparing your order', `Order ${order.orderNumber} is being prepared.`, 'box');
+  if (status === 'confirmed') pushNotification('customer', order.customerId, 'Order confirmed', 'Your order was accepted.', 'checkCircle', { linkType: 'order', linkId: order.id });
+  if (status === 'preparing') pushNotification('customer', order.customerId, 'Preparing your order', `Order ${order.orderNumber} is being prepared.`, 'box', { linkType: 'order', linkId: order.id });
   if (status === 'agent_assigned') {
-    pushNotification('customer', order.customerId, 'Agent assigned', `A delivery agent has been assigned to order ${order.orderNumber}.`, 'bike');
-    if (order.agentId) pushNotification('agent', order.agentId, 'New delivery job', `Order ${order.orderNumber} assigned to you.`, 'truck');
+    pushNotification('customer', order.customerId, 'Agent assigned', `A delivery agent has been assigned to order ${order.orderNumber}.`, 'bike', { linkType: 'order', linkId: order.id });
+    if (order.agentId) pushNotification('agent', order.agentId, 'New delivery job', `Order ${order.orderNumber} assigned to you.`, 'truck', { linkType: 'order', linkId: order.id });
   }
-  if (status === 'picked_up') pushNotification('customer', order.customerId, 'Order picked up', 'Your order has been picked up.', 'truck');
-  if (status === 'out_for_delivery') pushNotification('customer', order.customerId, 'Agent is on the way', 'Your order is out for delivery.', 'bike');
+  if (status === 'picked_up') pushNotification('customer', order.customerId, 'Order picked up', 'Your order has been picked up.', 'truck', { linkType: 'order', linkId: order.id });
+  if (status === 'out_for_delivery') pushNotification('customer', order.customerId, 'Agent is on the way', 'Your order is out for delivery.', 'bike', { linkType: 'order', linkId: order.id });
   if (status === 'delivered') {
-    pushNotification('customer', order.customerId, 'Order delivered', `Order ${order.orderNumber} has been delivered.`, 'checkCircle');
+    pushNotification('customer', order.customerId, 'Order delivered', `Order ${order.orderNumber} has been delivered.`, 'checkCircle', { linkType: 'order', linkId: order.id });
     const agent = order.agentId ? getAgent(order.agentId) : null;
     if (agent) {
       agent.completedDeliveries = (agent.completedDeliveries || 0) + 1;
@@ -484,7 +484,7 @@ function updateOrderStatus(orderId, status, extra) {
       agent.status = 'online';
     }
   }
-  if (status === 'cancelled') pushNotification('customer', order.customerId, 'Order cancelled', `Order ${order.orderNumber} was cancelled.`, 'errorCircle');
+  if (status === 'cancelled') pushNotification('customer', order.customerId, 'Order cancelled', `Order ${order.orderNumber} was cancelled.`, 'errorCircle', { linkType: 'order', linkId: order.id });
   saveData(DB);
   if (window.PXDynastySBC && window.PXDynastySBC.upsertOrder) {
     window.PXDynastySBC.upsertOrder(order).then((r) => {
@@ -518,11 +518,48 @@ function createSettlement(businessId) {
   return settlement;
 }
 
-function pushNotification(role, refId, title, body, icon) {
-  const n = { id: genId('notif'), role, refId, title, body, time: new Date().toISOString(), read: false, icon: icon || 'bell' };
+function pushNotification(role, refId, title, body, icon, opts) {
+  opts = opts || {};
+  const n = {
+    id: genId('notif'),
+    role, refId, title, body,
+    time: new Date().toISOString(),
+    read: false,
+    icon: icon || 'bell',
+    linkType: opts.linkType || null,
+    linkId: opts.linkId || null,
+    channel: opts.channel || null,
+  };
   DB.notifications.unshift(n);
   if (window.PXDynastySBC && window.PXDynastySBC.upsertNotification) {
     window.PXDynastySBC.upsertNotification(n).catch(() => {});
+  }
+}
+
+/* Notify everyone who is a party to a chat channel, except the sender. */
+function notifyChannelParticipants(channel, order, sender, preview) {
+  if (!order) return;
+  const firstLine = (preview || '').split('\n')[0].slice(0, 90);
+  const title = `New message · ${order.orderNumber}`;
+
+  const isCustomer = channel === 'all' || channel === 'cust-biz' || channel === 'cust-agent' || channel === 'admin-cust';
+  const isBusiness = channel === 'all' || channel === 'cust-biz' || channel === 'biz-agent' || channel === 'admin-biz';
+  const isAgent    = channel === 'all' || channel === 'cust-agent' || channel === 'biz-agent' || channel === 'admin-agent';
+  const isAdmin    = channel.startsWith('admin-') || channel === 'all';
+
+  const linkOpts = { linkType: 'chat', linkId: order.id, channel };
+
+  if (isCustomer && sender.role !== 'customer') {
+    pushNotification('customer', order.customerId, title, firstLine, 'bell2', linkOpts);
+  }
+  if (isBusiness && sender.role !== 'business' && sender.role !== 'staff') {
+    pushNotification('business', order.businessId, title, firstLine, 'bell2', linkOpts);
+  }
+  if (isAgent && order.agentId && sender.role !== 'agent') {
+    pushNotification('agent', order.agentId, title, firstLine, 'bell2', linkOpts);
+  }
+  if (isAdmin && sender.role !== 'admin') {
+    pushNotification('admin', null, title, firstLine, 'bell2', linkOpts);
   }
 }
 function getNotifications(role, refId) {
@@ -1592,7 +1629,7 @@ function notificationsView() {
       ${unreadCountNow > 0 ? `<button class="btn btn-outline btn-sm" data-action="mark-all-read">Mark all read</button>` : ''}
     </div>
     ${list.length ? `<div class="card">${list.slice(0, 100).map((n) => `
-      <div class="notif-item ${n.read ? '' : 'unread'}">
+      <div class="notif-item ${n.read ? '' : 'unread'} pressable" style="cursor:${n.linkType ? 'pointer' : 'default'};" data-action="${n.linkType ? 'open-notification' : 'no-op'}" data-id="${n.id}">
         <div class="n-icon" style="${n.read ? 'opacity:.6;' : ''}">${ICONS[n.icon] || ICONS.bell}</div>
         <div style="flex:1;min-width:0;">
           <div class="n-title" style="${n.read ? '' : 'font-weight:800;'}">${escapeHtml(n.title)}</div>
@@ -1602,6 +1639,55 @@ function notificationsView() {
         ${n.read ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:var(--color-primary);flex-shrink:0;margin-top:6px;"></span>'}
       </div>`).join('')}</div>` : emptyState('bell', 'No notifications yet', 'Updates about your orders will appear here.', null)}
   `;
+}
+
+/* Route a notification tap to the correct screen for the current role. */
+function openNotificationFromId(notifId) {
+  const n = DB.notifications.find((x) => x.id === notifId);
+  if (!n) { toast('Notification not found', 'info'); return; }
+
+  // Mark it as read just in case.
+  if (!n.read) {
+    n.read = true;
+    if (window.PXDynastySBC && window.PXDynastySBC.upsertNotification) {
+      window.PXDynastySBC.upsertNotification(n).catch(() => {});
+    }
+  }
+
+  // Chat message → open order chat on the right channel.
+  if (n.linkType === 'chat' && n.linkId) {
+    const order = getOrder(n.linkId);
+    if (!order) { toast('Order no longer available', 'info'); return; }
+    const me = currentSenderInfo();
+    const allowed = chatChannelsForRole(me.role).map((c) => c.id);
+    const channel = (n.channel && allowed.includes(n.channel)) ? n.channel : 'all';
+    openOrderChat(n.linkId, { forcedChannel: channel });
+    return;
+  }
+
+  // Order-related → open order summary (accessible from any role).
+  if (n.linkType === 'order' && n.linkId) {
+    const order = getOrder(n.linkId);
+    if (!order) { toast('Order no longer available', 'info'); return; }
+    openOrderSummary(n.linkId);
+    return;
+  }
+
+  // Support ticket → open the support conversation.
+  if (n.linkType === 'support' && n.linkId) {
+    if (_supportTickets.some((t) => t.id === n.linkId)) {
+      openSupportConversation(n.linkId);
+    } else {
+      loadSupportTickets().then(() => openSupportConversation(n.linkId));
+    }
+    return;
+  }
+
+  // Fallback: navigate to a sensible default for the current role.
+  if (state.role === 'customer') navigate('orders-list');
+  else if (state.role === 'business') navigate('biz-orders');
+  else if (state.role === 'agent') navigate('agent-history');
+  else navigate('admin-support');
 }
 
 /* ==========================================================================
@@ -3594,6 +3680,9 @@ async function sendChatMessage(orderId) {
   } else {
     toast('Message service unavailable', 'error');
   }
+  // Notify the other participants of this channel.
+  const ord = getOrder(orderId);
+  if (ord) notifyChannelParticipants(msg.channel, ord, msg, body);
 }
 
 function setChatChannel(channel) {
@@ -3827,7 +3916,7 @@ async function submitSupportTicket(orderId) {
     window.PXDynastySBC.insertMessage(chatMsg).catch(() => {});
   }
 
-  pushNotification('admin', null, 'New support ticket', `${subject} — from ${me.name}`, 'gavel');
+  pushNotification('admin', null, 'New support ticket', `${subject} — from ${me.name}`, 'gavel', { linkType: 'support', linkId: ticket.id });
 
   closeModal();
   toast('Support ticket submitted', 'success');
@@ -4471,6 +4560,13 @@ function handleAction(el, ev) {
     case 'open-order-summary': openOrderSummary(el.dataset.orderId); break;
     case 'open-order-chat': openOrderChat(el.dataset.orderId); break;
     case 'chat-set-channel': setChatChannel(el.dataset.channel); break;
+    case 'open-notification': {
+      const id = el.dataset.id;
+      // Close the notifications page context if we're there.
+      openNotificationFromId(id);
+      break;
+    }
+    case 'no-op': break;
     case 'create-subaccount': {
       const id = el.dataset.id;
       const b = getBusiness(id);

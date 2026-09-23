@@ -283,6 +283,9 @@ function sbcRowToNotification(r) {
     body: r.body,
     icon: r.icon,
     read: r.read || false,
+    linkType: r.link_type || null,
+    linkId: r.link_id || null,
+    channel: r.channel || null,
     time: r.created_at,
   };
 }
@@ -295,6 +298,9 @@ function sbcNotificationToRow(n) {
     body: n.body || '',
     icon: n.icon || 'bell',
     read: !!n.read,
+    link_type: n.linkType || null,
+    link_id: n.linkId || null,
+    channel: n.channel || null,
   };
 }
 
