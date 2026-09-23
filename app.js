@@ -2931,8 +2931,9 @@ function adminDisputes() {
             </div>` : ''}
           <div class="row-card-actions">
             ${o ? `<button class="btn btn-outline btn-sm" data-action="open-order-summary" data-order-id="${o.id}">View order</button>` : ''}
+            <button class="btn ${t.status === 'open' ? 'btn-primary' : 'btn-outline'} btn-sm" data-action="support-open-conversation" data-id="${t.id}">${t.status === 'open' ? 'Open conversation' : 'View conversation'}</button>
             ${t.status === 'open'
-              ? `<button class="btn btn-primary btn-sm" data-action="support-reply-open" data-id="${t.id}">Reply &amp; resolve</button>`
+              ? `<button class="btn btn-outline btn-sm" data-action="support-mark-resolved" data-id="${t.id}">Mark resolved</button>`
               : `<button class="btn btn-outline btn-sm" data-action="support-reopen" data-id="${t.id}">Reopen</button>`}
           </div>
         </div>`;
@@ -3459,26 +3460,58 @@ function renderChatClaimBanner() {
   wrap.innerHTML = chatClaimBannerHtml(order);
 }
 
-function openOrderChat(orderId) {
+function openOrderChat(orderId, opts) {
+  opts = opts || {};
   const order = getOrder(orderId);
-  if (!order) { toast('Order not found', 'error'); return; }
+
+  // Support tickets can be opened without a real order (synthetic thread key).
+  const synthetic = !order && opts.supportTicketId;
+  if (!order && !synthetic) { toast('Order not found', 'error'); return; }
+
+  const me = currentSenderInfo();
+  const locked = order ? isChatLockedForMe(order) : false;
+  const ticket = opts.supportTicketId ? _supportTickets.find((x) => x.id === opts.supportTicketId) : null;
+
   stopChatPolling();
   _chatOrderId = orderId;
   _chatLastIds = new Set();
   _chatAllMessages = [];
-  _chatActiveChannel = 'all';
+  _chatActiveChannel = opts.forcedChannel || 'all';
+  _chatSupportTicketId = ticket ? ticket.id : null;
 
-  const me = currentSenderInfo();
-  const locked = isChatLockedForMe(order);
+  const headerTitle = ticket
+    ? ('Support · ' + escapeHtml(ticket.subject))
+    : ('Order chat · ' + escapeHtml(order ? order.orderNumber : 'Unknown'));
+  const headerSub = ticket
+    ? ('From ' + escapeHtml(ticket.openedByName || 'user'))
+    : escapeHtml((getBusiness(order.businessId) || {}).name || '');
+
+  const ticketBanner = ticket ? `
+    <div class="card" style="background:var(--color-accent-tint);border-color:var(--color-accent);padding:10px 12px;margin-bottom:10px;">
+      <div class="flex items-center justify-between">
+        <div>
+          <strong style="font-size:12.5px;color:var(--color-accent-dark);">${ticket.status === 'resolved' ? 'This ticket is resolved' : 'Support ticket: ' + escapeHtml(ticket.subject)}</strong>
+          <p class="text-sm mt-4" style="margin:0;color:var(--color-accent-dark);">${ticket.status === 'resolved' ? 'Reopen to send more messages.' : 'Keep the conversation going until the issue is resolved.'}</p>
+        </div>
+        ${ticket.status === 'resolved'
+          ? `<button class="btn btn-outline btn-sm" data-action="support-reopen-from-chat" data-id="${ticket.id}">Reopen</button>`
+          : `<button class="btn btn-primary btn-sm" data-action="support-resolve-from-chat" data-id="${ticket.id}">Mark resolved</button>`}
+      </div>
+    </div>` : '';
+
+  // If the ticket is resolved, disable sending.
+  const ticketLocked = ticket && ticket.status === 'resolved';
+  const inputLocked = locked || ticketLocked;
 
   openModal(`
     <div class="modal-head">
       <div>
-        <h3>Order chat · ${escapeHtml(order.orderNumber)}</h3>
-        <div class="text-sm text-muted" style="margin-top:2px;">${escapeHtml((getBusiness(order.businessId) || {}).name || '')}</div>
+        <h3>${headerTitle}</h3>
+        <div class="text-sm text-muted" style="margin-top:2px;">${headerSub}</div>
       </div>
       <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
     </div>
+    ${ticketBanner}
     <div id="chat-claim-banner"></div>
     ${currentSenderInfo().role === 'admin' ? (() => {
       const _b = getBusiness(order.businessId) || {};
@@ -3496,8 +3529,8 @@ function openOrderChat(orderId) {
     <div id="chat-tabs" style="display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--color-border);padding-bottom:2px;margin-bottom:8px;"></div>
     <div id="chat-messages" style="max-height:320px;overflow-y:auto;padding:10px 4px 6px;border-radius:var(--radius-sm);background:var(--color-bg);"></div>
     <div style="display:flex;gap:8px;margin-top:12px;">
-      <input type="text" id="chat-input" placeholder="${locked ? 'Chat is locked to another teammate' : 'Type a message…'}" style="flex:1;" autocomplete="off" ${locked ? 'disabled' : ''} />
-      <button class="btn btn-primary" data-action="chat-send" data-order-id="${order.id}" ${locked ? 'disabled' : ''}>Send</button>
+      <input type="text" id="chat-input" placeholder="${inputLocked ? (ticketLocked ? 'Ticket resolved — reopen to reply' : 'Chat is locked to another teammate') : 'Type a message…'}" style="flex:1;" autocomplete="off" ${inputLocked ? 'disabled' : ''} />
+      <button class="btn btn-primary" data-action="chat-send" data-order-id="${orderId}" ${inputLocked ? 'disabled' : ''}>Send</button>
     </div>
     <p class="text-sm text-faint" style="margin-top:8px;text-align:center;">${escapeHtml(chatChannelVisibility(_chatActiveChannel))}</p>
   `);
@@ -3508,15 +3541,10 @@ function openOrderChat(orderId) {
   loadChatMessages(orderId);
   _chatPollTimer = setInterval(() => {
     loadChatMessages(orderId);
-    // Also refresh the claim state so releases propagate.
-    if (window.PXDynastySBC && window.PXDynastySBC.fetchAll) {
-      // Cheaper: only re-fetch if the order's claim has changed.
-      // For now, re-render from the local object — cloud sync happens on next hydrate.
-    }
   }, 4000);
 
   const input = document.getElementById('chat-input');
-  if (input && !locked) {
+  if (input && !inputLocked) {
     input.focus();
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -3529,10 +3557,18 @@ function openOrderChat(orderId) {
 }
 
 async function sendChatMessage(orderId) {
-  const order = getOrder(orderId);
-  if (isChatLockedForMe(order)) {
+  // Support-ticket threads are keyed 'support:<ticketId>'; there is no order.
+  const order = orderId && orderId.indexOf('support:') === 0 ? null : getOrder(orderId);
+  if (order && isChatLockedForMe(order)) {
     toast('Chat is locked to another teammate', 'error');
     return;
+  }
+  if (_chatSupportTicketId) {
+    const t = _supportTickets.find((x) => x.id === _chatSupportTicketId);
+    if (t && t.status === 'resolved') {
+      toast('Ticket is resolved — reopen to reply', 'info');
+      return;
+    }
   }
   const input = document.getElementById('chat-input');
   if (!input) return;
@@ -3677,6 +3713,30 @@ function openOrderSummary(orderId) {
       ${ICONS.bell2} Open order chat
     </button>
   `);
+}
+
+/* Map a support ticket to the right chat channel. */
+function supportChannelFor(ticket) {
+  const r = ticket.openedByRole;
+  if (r === 'customer') return 'admin-cust';
+  if (r === 'business' || r === 'staff') return 'admin-biz';
+  if (r === 'agent') return 'admin-agent';
+  return 'admin-cust'; // default for public/merchant enquiries
+}
+
+/* Thread key for a support conversation: the real order when one exists,
+   or a synthetic key so orderless tickets still get a chat thread. */
+function supportThreadKey(ticket) {
+  if (ticket.orderId) return ticket.orderId;
+  return 'support:' + ticket.id;
+}
+
+function openSupportConversation(ticketId) {
+  const t = _supportTickets.find((x) => x.id === ticketId);
+  if (!t) { toast('Ticket not found', 'error'); return; }
+  const channel = supportChannelFor(t);
+  const key = supportThreadKey(t);
+  openOrderChat(key, { supportTicketId: t.id, forcedChannel: channel });
 }
 
 function orderChatButton(orderId, label) {
@@ -4432,6 +4492,54 @@ function handleAction(el, ev) {
     case 'admin-support-filter': navigate('admin-support', { status: el.dataset.status }); break;
     case 'support-reply-open': openSupportReplyModal(el.dataset.id); break;
     case 'support-reply-send': sendSupportReply(el.dataset.id); break;
+    case 'support-open-conversation': openSupportConversation(el.dataset.id); break;
+    case 'support-mark-resolved': {
+      const id = el.dataset.id;
+      const t = _supportTickets.find((x) => x.id === id);
+      if (!t) break;
+      if (window.PXDynastySBC && window.PXDynastySBC.updateTicket) {
+        window.PXDynastySBC.updateTicket(id, { status: 'resolved' }).catch(() => {});
+      }
+      t.status = 'resolved';
+      // Notify the opener.
+      const msg = 'Your support request has been marked resolved.';
+      if (t.openedByRole === 'customer') pushNotification('customer', t.openedById, 'Support resolved', msg, 'checkCircle');
+      else if (t.openedByRole === 'business') pushNotification('business', t.openedById, 'Support resolved', msg, 'checkCircle');
+      else if (t.openedByRole === 'agent') pushNotification('agent', t.openedById, 'Support resolved', msg, 'checkCircle');
+      toast('Ticket marked resolved', 'success');
+      render();
+      break;
+    }
+    case 'support-resolve-from-chat': {
+      const id = el.dataset.id;
+      const t = _supportTickets.find((x) => x.id === id);
+      if (!t) break;
+      if (window.PXDynastySBC && window.PXDynastySBC.updateTicket) {
+        window.PXDynastySBC.updateTicket(id, { status: 'resolved' }).catch(() => {});
+      }
+      t.status = 'resolved';
+      const msg = 'Your support request has been marked resolved.';
+      if (t.openedByRole === 'customer') pushNotification('customer', t.openedById, 'Support resolved', msg, 'checkCircle');
+      else if (t.openedByRole === 'business') pushNotification('business', t.openedById, 'Support resolved', msg, 'checkCircle');
+      else if (t.openedByRole === 'agent') pushNotification('agent', t.openedById, 'Support resolved', msg, 'checkCircle');
+      toast('Ticket resolved — conversation locked', 'success');
+      closeModal();
+      render();
+      break;
+    }
+    case 'support-reopen-from-chat': {
+      const id = el.dataset.id;
+      const t = _supportTickets.find((x) => x.id === id);
+      if (!t) break;
+      if (window.PXDynastySBC && window.PXDynastySBC.updateTicket) {
+        window.PXDynastySBC.updateTicket(id, { status: 'open' }).catch(() => {});
+      }
+      t.status = 'open';
+      toast('Ticket reopened', 'success');
+      // Reopen chat with fresh state.
+      openSupportConversation(id);
+      break;
+    }
     case 'support-reopen': reopenSupportTicket(el.dataset.id); break;
     case 'mark-all-read': {
       const refId = state.role === 'customer' ? state.currentCustomerId : state.role === 'business' ? state.currentBusinessId : state.role === 'agent' ? state.currentAgentId : null;
