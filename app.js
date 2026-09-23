@@ -819,6 +819,8 @@ function renderCustomerView() {
     case 'profile': return customerProfile();
     case 'customer-addresses': return customerAddresses();
     case 'customer-payment-methods': return customerPaymentMethods();
+    case 'customer-terms': return customerTerms();
+    case 'customer-privacy': return customerPrivacy();
     case 'notifications': return notificationsView();
     default: return customerHome();
   }
@@ -1149,13 +1151,22 @@ function customerCheckout() {
   let body = '';
   if (step === 1) {
     const addrs = cust.addresses || [];
+    const defaultAddr = addrs.find((a) => a.isDefault) || addrs[0];
+    const selectedId = checkoutData.addressId || (defaultAddr ? defaultAddr.id : null);
+    if (!checkoutData.addressId && defaultAddr) {
+      checkoutData.addressId = defaultAddr.id;
+      checkoutData.address = defaultAddr.line;
+    }
     body = `<div class="card">
       <div class="form-group"><label>Delivery address</label>
         ${addrs.length
-          ? `<select id="ck-address">${addrs.map((a) => `<option value="${a.id}" ${checkoutData.addressId === a.id ? 'selected' : ''}>${escapeHtml(a.label)} — ${escapeHtml(a.line)}</option>`).join('')}</select>`
+          ? `<select id="ck-address">${addrs.map((a) => `<option value="${a.id}" ${selectedId === a.id ? 'selected' : ''}>${escapeHtml(a.label)}${a.isDefault ? ' (default)' : ''} — ${escapeHtml(a.line)}</option>`).join('')}</select>`
           : `<input type="text" id="ck-address-freeform" placeholder="Enter your delivery address" value="${escapeHtml(checkoutData.address)}" />`}
       </div>
-      <button class="btn btn-outline btn-sm" data-action="add-address-inline">${ICONS.plus} Add new address</button>
+      <div class="flex gap-8">
+        <button class="btn btn-outline btn-sm" data-action="address-open">${ICONS.plus} Add address</button>
+        <button class="btn btn-ghost btn-sm" data-action="nav" data-view="customer-addresses">Manage addresses</button>
+      </div>
     </div>`;
   } else if (step === 2) {
     const authUser = window.PXDynastyAuth && window.PXDynastyAuth.currentUserSync && window.PXDynastyAuth.currentUserSync();
@@ -1433,17 +1444,119 @@ function customerAddresses() {
   const cust = getCustomer(state.currentCustomerId);
   const addrs = cust ? (cust.addresses || []) : [];
   return `${backBtn('Account')}
-    <div class="page-head"><h1>Saved addresses</h1></div>
-    ${addrs.length ? `<div class="row-cards">${addrs.map((a) => `<div class="row-card"><div class="row-card-top"><span class="row-card-title">${escapeHtml(a.label)}</span></div><div class="row-card-sub">${escapeHtml(a.line)}</div></div>`).join('')}</div>` : emptyState('location', 'No saved addresses', 'Add an address to speed up checkout.', null)}
-    <button class="btn btn-outline btn-block mt-16" data-action="add-address-inline">${ICONS.plus} Add new address</button>`;
+    <div class="page-head"><h1>Saved addresses</h1><div class="sub">${addrs.length} saved</div></div>
+    ${addrs.length ? `<div class="row-cards">${addrs.map((a) => `
+      <div class="row-card">
+        <div class="row-card-top">
+          <span class="row-card-title">${escapeHtml(a.label)}${a.isDefault ? ' <span class="status-badge status-success" style="margin-left:6px;">Default</span>' : ''}</span>
+        </div>
+        <div class="row-card-sub">${escapeHtml(a.line)}</div>
+        ${a.phone ? `<div class="row-card-sub">${escapeHtml(a.phone)}</div>` : ''}
+        <div class="row-card-actions">
+          <button class="btn btn-outline btn-sm" data-action="address-open" data-id="${a.id}">Edit</button>
+          ${!a.isDefault ? `<button class="btn btn-outline btn-sm" data-action="address-set-default" data-id="${a.id}">Set default</button>` : ''}
+          <button class="btn btn-danger btn-sm" data-action="address-delete" data-id="${a.id}">Delete</button>
+        </div>
+      </div>`).join('')}</div>` : emptyState('location', 'No saved addresses', 'Add your first delivery address to speed up checkout.', null)}
+    <button class="btn btn-primary btn-block mt-16" data-action="address-open">${ICONS.plus} Add new address</button>`;
+}
+
+function openAddressModal(editId) {
+  const cust = getCustomer(state.currentCustomerId) || {};
+  const existing = editId ? (cust.addresses || []).find((a) => a.id === editId) : null;
+  const isFirstEver = (cust.addresses || []).length === 0;
+  openModal(`
+    <div class="modal-head">
+      <h3>${existing ? 'Edit address' : 'Add address'}</h3>
+      <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
+    </div>
+    <div class="form-group"><label>Label</label>
+      <input type="text" id="ad-label" placeholder="e.g. Home, Office" value="${existing ? escapeHtml(existing.label) : ''}" />
+    </div>
+    <div class="form-group"><label>Full address</label>
+      <textarea id="ad-line" placeholder="Street, area, city" style="min-height:70px;">${existing ? escapeHtml(existing.line) : ''}</textarea>
+    </div>
+    <div class="form-group"><label>Phone for this address (optional)</label>
+      <input type="tel" id="ad-phone" placeholder="080..." value="${existing ? escapeHtml(existing.phone || '') : ''}" />
+    </div>
+    <label class="radio-card ${(existing && existing.isDefault) || isFirstEver ? 'selected' : ''}" style="margin-bottom:12px;cursor:pointer;">
+      <input type="checkbox" id="ad-default" ${(existing && existing.isDefault) || isFirstEver ? 'checked' : ''} ${isFirstEver ? 'disabled' : ''} />
+      <span style="font-size:13.5px;">${isFirstEver ? 'Use as my default address' : 'Set as default address'}</span>
+    </label>
+    <div class="auth-error" id="ad-error"></div>
+    <button class="btn btn-primary btn-block mt-12" data-action="address-save" data-id="${editId || ''}">${existing ? 'Save changes' : 'Add address'}</button>
+  `);
 }
 function customerPaymentMethods() {
   const cust = getCustomer(state.currentCustomerId);
-  const pms = cust ? (cust.paymentMethods || []) : [];
+  const pref = cust ? (cust.preferredPaymentMethod || 'card') : 'card';
+  const methods = [
+    ['card', 'Bank card', 'Pay with any Nigerian or international card', ICONS.card],
+    ['transfer', 'Bank transfer', 'Pay via your bank app — instant confirmation', ICONS.bank],
+    ['wallet', 'PXDynasty wallet', 'Pay from your top-up balance (coming soon)', ICONS.wallet],
+    ['cashless', 'Other cashless payment', 'USSD, QR, or other methods', ICONS.shield],
+  ];
   return `${backBtn('Account')}
-    <div class="page-head"><h1>Payment methods</h1></div>
-    ${pms.length ? `<div class="row-cards">${pms.map((p) => `<div class="row-card flex items-center gap-10">${ICONS.card}<span style="font-weight:700;font-size:13.5px;">${escapeHtml(p.label)}</span></div>`).join('')}</div>` : emptyState('card', 'No payment methods', 'Add a card to check out faster.', null)}
-    <button class="btn btn-outline btn-block mt-16" data-action="toast-info" data-msg="Add payment method — coming soon">${ICONS.plus} Add payment method</button>`;
+    <div class="page-head"><h1>Payment preference</h1><div class="sub">Your default at checkout</div></div>
+    <div class="card" style="background:var(--color-surface-alt);">
+      <p class="text-sm" style="margin:0;">${ICONS.shield} PXDynasty does not store your card details. You'll enter them securely at Paystack each time. This preference just sets your default.</p>
+    </div>
+    <div class="row-cards mt-12">
+      ${methods.map(([val, label, desc, icon]) => `
+        <div class="row-card pressable" style="cursor:pointer;${pref === val ? 'border-color:var(--color-primary);background:var(--color-primary-tint);' : ''}" data-action="set-payment-preference" data-method="${val}">
+          <div class="flex items-center gap-10">
+            ${icon}
+            <div style="flex:1;">
+              <div style="font-weight:700;font-size:14px;">${label}</div>
+              <div class="text-sm text-muted">${desc}</div>
+            </div>
+            ${pref === val ? `<span class="status-badge status-success">Default</span>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+function customerTerms() {
+  return `${backBtn('Account')}
+    <div class="page-head"><h1>Terms of service</h1></div>
+    <div class="card"><div style="font-size:13.5px;line-height:1.7;color:var(--color-text-muted);">
+      <p>PXDynasty is a local marketplace connecting customers, businesses, and delivery agents in Nigeria. By using this platform you agree to the following:</p>
+      <p><strong style="color:var(--color-text);">1. Orders.</strong> When you place an order, you commit to paying the listed price. Orders are fulfilled by independent businesses. PXDynasty coordinates and processes payment.</p>
+      <p><strong style="color:var(--color-text);">2. Delivery.</strong> Delivery is provided by independent agents. Timelines vary. PXDynasty facilitates but does not itself own delivery vehicles.</p>
+      <p><strong style="color:var(--color-text);">3. Refunds.</strong> If an order is not delivered or is materially different from what was described, you may open a dispute within 24 hours. Refunds are processed via the original payment method.</p>
+      <p><strong style="color:var(--color-text);">4. Conduct.</strong> Do not misuse the platform, harass other users, or attempt to circumvent payment.</p>
+      <p><strong style="color:var(--color-text);">5. Changes.</strong> These terms may be updated. Continued use means acceptance.</p>
+    </div></div>
+  `;
+}
+
+function customerPrivacy() {
+  return `${backBtn('Account')}
+    <div class="page-head"><h1>Privacy policy</h1></div>
+    <div class="card"><div style="font-size:13.5px;line-height:1.7;color:var(--color-text-muted);">
+      <p>We take your privacy seriously.</p>
+      <p><strong style="color:var(--color-text);">What we collect.</strong> Name, email, phone, delivery address, and order history. For payment, your card details are handled by Paystack — we never see or store them.</p>
+      <p><strong style="color:var(--color-text);">How we use it.</strong> To fulfil orders, communicate about deliveries, and improve the platform. We don't sell your data.</p>
+      <p><strong style="color:var(--color-text);">Who sees it.</strong> The business fulfilling your order sees your name, phone, and delivery address. The delivery agent sees the same to complete the delivery.</p>
+      <p><strong style="color:var(--color-text);">Your rights.</strong> You can request a copy of your data or ask for it to be deleted by contacting support.</p>
+    </div></div>
+  `;
+}
+
+function openHelpModal() {
+  openModal(`
+    <div class="modal-head"><h3>Help & support</h3><button class="icon-btn" data-action="close-modal">${ICONS.x}</button></div>
+    <p class="text-sm text-muted">Reach us for order issues, disputes, or questions.</p>
+    <div class="row-cards mt-12" style="gap:8px;">
+      <a class="row-card" href="https://wa.me/2349063200718" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+        ${ICONS.phone}<div><div style="font-weight:700;font-size:14px;">WhatsApp</div><div class="text-sm text-muted">Fastest — usually within minutes</div></div>
+      </a>
+      <a class="row-card" href="mailto:hello@pxdynasty.com" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+        ${ICONS.receipt}<div><div style="font-weight:700;font-size:14px;">Email</div><div class="text-sm text-muted">hello@pxdynasty.com</div></div>
+      </a>
+    </div>
+  `);
 }
 
 function notificationsView() {
@@ -3295,6 +3408,83 @@ function handleAction(el, ev) {
       break;
     }
     case 'open-order-chat': openOrderChat(el.dataset.orderId); break;
+    case 'address-open': openAddressModal(el.dataset.id || null); break;
+    case 'address-save': {
+      const id = el.dataset.id || '';
+      const cust = getCustomer(state.currentCustomerId);
+      if (!cust) break;
+      const label = ((document.getElementById('ad-label') || {}).value || '').trim();
+      const line = ((document.getElementById('ad-line') || {}).value || '').trim();
+      const phone = ((document.getElementById('ad-phone') || {}).value || '').trim();
+      const isDefault = (document.getElementById('ad-default') || {}).checked || false;
+      const errBox = document.getElementById('ad-error');
+      if (!label) { if (errBox) errBox.textContent = 'Enter a label.'; break; }
+      if (!line) { if (errBox) errBox.textContent = 'Enter the address.'; break; }
+      cust.addresses = cust.addresses || [];
+      if (id) {
+        const a = cust.addresses.find((x) => x.id === id);
+        if (a) {
+          a.label = label; a.line = line; a.phone = phone;
+          if (isDefault) cust.addresses.forEach((x) => { x.isDefault = false; });
+          a.isDefault = isDefault;
+        }
+      } else {
+        const newId = 'addr-' + Math.random().toString(36).slice(2, 8);
+        const firstEver = cust.addresses.length === 0;
+        if (isDefault || firstEver) cust.addresses.forEach((x) => { x.isDefault = false; });
+        cust.addresses.push({ id: newId, label, line, phone, isDefault: isDefault || firstEver });
+        if (!state.checkoutData) state.checkoutData = {};
+        state.checkoutData.addressId = newId;
+        state.checkoutData.address = line;
+      }
+      saveDataLocalOnly();
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertCustomer) window.PXDynastySBC.upsertCustomer(cust).catch(() => {});
+      closeModal();
+      toast(id ? 'Address updated' : 'Address added', 'success');
+      render();
+      break;
+    }
+    case 'address-delete': {
+      const id = el.dataset.id;
+      const cust = getCustomer(state.currentCustomerId);
+      if (!cust) break;
+      confirmDialog('Delete this address?', 'You can add it again later.', 'Delete', () => {
+        cust.addresses = (cust.addresses || []).filter((x) => x.id !== id);
+        const stillDefault = (cust.addresses || []).some((x) => x.isDefault);
+        if (!stillDefault && cust.addresses[0]) cust.addresses[0].isDefault = true;
+        saveDataLocalOnly();
+        if (window.PXDynastySBC && window.PXDynastySBC.upsertCustomer) window.PXDynastySBC.upsertCustomer(cust).catch(() => {});
+        toast('Address deleted', 'success');
+        render();
+      }, true);
+      break;
+    }
+    case 'address-set-default': {
+      const id = el.dataset.id;
+      const cust = getCustomer(state.currentCustomerId);
+      if (!cust) break;
+      (cust.addresses || []).forEach((x) => { x.isDefault = (x.id === id); });
+      saveDataLocalOnly();
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertCustomer) window.PXDynastySBC.upsertCustomer(cust).catch(() => {});
+      toast('Default address updated', 'success');
+      render();
+      break;
+    }
+    case 'set-payment-preference': {
+      const method = el.dataset.method;
+      const cust = getCustomer(state.currentCustomerId);
+      if (!cust) break;
+      cust.preferredPaymentMethod = method;
+      if (state.checkoutData) state.checkoutData.paymentMethod = method;
+      saveDataLocalOnly();
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertCustomer) window.PXDynastySBC.upsertCustomer(cust).catch(() => {});
+      toast('Payment preference saved', 'success');
+      render();
+      break;
+    }
+    case 'open-terms': navigate('customer-terms'); break;
+    case 'open-privacy': navigate('customer-privacy'); break;
+    case 'open-help': openHelpModal(); break;
     case 'chat-send': sendChatMessage(el.dataset.orderId); break;
     case 'open-more-menu': openMoreMenu(); break;
     case 'more-nav': closeModal(); navigate(el.dataset.view); break;
