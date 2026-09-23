@@ -3076,12 +3076,14 @@ function currentSenderInfo() {
 }
 
 function chatChannelsForRole(role) {
-  // Codes: 'all', 'cust-biz', 'cust-agent', 'biz-agent'
+  // Codes: 'all', 'cust-biz', 'cust-agent', 'biz-agent',
+  //        'admin-cust', 'admin-biz', 'admin-agent'
   if (role === 'customer') {
     return [
       { id: 'all', label: 'All' },
       { id: 'cust-biz', label: 'Business' },
       { id: 'cust-agent', label: 'Agent' },
+      { id: 'admin-cust', label: 'Support' },
     ];
   }
   if (role === 'business' || role === 'staff') {
@@ -3089,6 +3091,7 @@ function chatChannelsForRole(role) {
       { id: 'all', label: 'All' },
       { id: 'cust-biz', label: 'Customer' },
       { id: 'biz-agent', label: 'Agent' },
+      { id: 'admin-biz', label: 'Support' },
     ];
   }
   if (role === 'agent') {
@@ -3096,6 +3099,7 @@ function chatChannelsForRole(role) {
       { id: 'all', label: 'All' },
       { id: 'cust-agent', label: 'Customer' },
       { id: 'biz-agent', label: 'Business' },
+      { id: 'admin-agent', label: 'Support' },
     ];
   }
   if (role === 'admin') {
@@ -3104,9 +3108,26 @@ function chatChannelsForRole(role) {
       { id: 'cust-biz', label: 'Cust↔Biz' },
       { id: 'cust-agent', label: 'Cust↔Agent' },
       { id: 'biz-agent', label: 'Biz↔Agent' },
+      { id: 'admin-cust', label: '→ Customer' },
+      { id: 'admin-biz', label: '→ Business' },
+      { id: 'admin-agent', label: '→ Agent' },
     ];
   }
   return [{ id: 'all', label: 'All' }];
+}
+
+/* Human-readable description of who can see a given channel. */
+function chatChannelVisibility(channel) {
+  const map = {
+    'all':         'Everyone on this order',
+    'cust-biz':    'Customer and business only',
+    'cust-agent':  'Customer and delivery agent only',
+    'biz-agent':   'Business and delivery agent only',
+    'admin-cust':  'You and the customer only',
+    'admin-biz':   'You and the business only',
+    'admin-agent': 'You and the delivery agent only',
+  };
+  return map[channel] || 'Everyone on this order';
 }
 
 function stopChatPolling() {
@@ -3131,7 +3152,11 @@ function renderChatMessages() {
 
   if (!visible.length) {
     const label = (chatChannelsForRole(me.role).find((c) => c.id === _chatActiveChannel) || {}).label || 'this channel';
-    wrap.innerHTML = `<div class="text-sm text-muted" style="text-align:center;padding:24px 6px;">No messages in ${escapeHtml(label)} yet.</div>`;
+    const visibility = chatChannelVisibility(_chatActiveChannel);
+    wrap.innerHTML = `<div class="text-sm text-muted" style="text-align:center;padding:24px 6px;">
+      <div style="font-weight:700;color:var(--color-text);margin-bottom:4px;">No messages in ${escapeHtml(label)} yet.</div>
+      <div style="font-size:11.5px;">${escapeHtml(visibility)}</div>
+    </div>`;
     return;
   }
 
@@ -3227,13 +3252,26 @@ function openOrderChat(orderId) {
       <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
     </div>
     <div id="chat-claim-banner"></div>
+    ${currentSenderInfo().role === 'admin' ? (() => {
+      const _b = getBusiness(order.businessId) || {};
+      const _c = getCustomer(order.customerId) || {};
+      const _a = order.agentId ? getAgent(order.agentId) : null;
+      const rows = [];
+      if (_c.phone) rows.push({ label: 'Call customer', sub: _c.name, phone: _c.phone });
+      if (_b.phone) rows.push({ label: 'Call business', sub: _b.name, phone: _b.phone });
+      if (_a && _a.phone) rows.push({ label: 'Call agent', sub: _a.name, phone: _a.phone });
+      if (!rows.length) return '';
+      return `<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:6px;">
+        ${rows.map((r) => `<a class="btn btn-outline btn-sm" href="tel:${escapeHtml(r.phone)}" style="flex-shrink:0;">${ICONS.phone} ${escapeHtml(r.label)}</a>`).join('')}
+      </div>`;
+    })() : ''}
     <div id="chat-tabs" style="display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--color-border);padding-bottom:2px;margin-bottom:8px;"></div>
     <div id="chat-messages" style="max-height:320px;overflow-y:auto;padding:10px 4px 6px;border-radius:var(--radius-sm);background:var(--color-bg);"></div>
     <div style="display:flex;gap:8px;margin-top:12px;">
       <input type="text" id="chat-input" placeholder="${locked ? 'Chat is locked to another teammate' : 'Type a message…'}" style="flex:1;" autocomplete="off" ${locked ? 'disabled' : ''} />
       <button class="btn btn-primary" data-action="chat-send" data-order-id="${order.id}" ${locked ? 'disabled' : ''}>Send</button>
     </div>
-    <p class="text-sm text-faint" style="margin-top:8px;text-align:center;">Messages on this tab are visible only to the parties shown.</p>
+    <p class="text-sm text-faint" style="margin-top:8px;text-align:center;">${escapeHtml(chatChannelVisibility(_chatActiveChannel))}</p>
   `);
 
   renderChatClaimBanner();
@@ -3298,6 +3336,10 @@ function setChatChannel(channel) {
   _chatActiveChannel = channel;
   renderChatTabs();
   renderChatMessages();
+  // Update the visibility hint below the input.
+  const hintEls = document.querySelectorAll('.modal-sheet p.text-faint');
+  const lastHint = hintEls[hintEls.length - 1];
+  if (lastHint) lastHint.textContent = chatChannelVisibility(channel);
   const input = document.getElementById('chat-input');
   if (input) input.focus();
 }
