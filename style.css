@@ -1112,3 +1112,61 @@ textarea { resize: vertical; min-height: 80px; }
 
 /* Hide any of the old animated auth visuals that still linger */
 .auth-blobs, .auth-floaters { display: none !important; }
+
+/* ==========================================================================
+   CHAT PREVIEW — unread badges + last-message snippets on chat buttons
+   ========================================================================== */
+
+.chat-button-wrap { display: flex; flex-direction: column; gap: 4px; }
+
+.chat-button {
+  position: relative;
+}
+
+.chat-unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 800;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+/* When button is outline (no unread) the badge won't appear, but keep it
+   styled in case a 0-badge ever gets rendered accidentally. */
+.btn-outline .chat-unread-badge {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.chat-preview-line {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  padding: 0 4px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.chat-inline-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  margin-right: 4px;
+  vertical-align: middle;
+}

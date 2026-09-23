@@ -1786,8 +1786,14 @@ function businessOrderCardHtml(o, withActions) {
     </div>
     <div class="row-card-sub">${escapeHtml(cust.name)} · ${o.items.length} item(s) · ${formatNaira(o.total)}</div>
     <div class="row-card-sub">${timeAgo(o.createdAt)}</div>
+    ${(() => {
+      const p = chatPreviewFor(o.id);
+      if (!p || (!p.count && !p.lastBody)) return '';
+      return `<div class="chat-preview-line" style="margin-top:6px;">${p.count ? `<span class="chat-inline-badge">${p.count}</span> ` : ''}${escapeHtml((p.lastBody || '').slice(0, 70))}${(p.lastBody || '').length > 70 ? '…' : ''}</div>`;
+    })()}
     <div class="row-card-actions">
       <button class="btn btn-outline btn-sm" data-action="nav" data-view="biz-order-detail" data-order-id="${o.id}">View</button>
+      <button class="btn btn-outline btn-sm" data-action="open-order-chat" data-order-id="${o.id}">Chat${(() => { const c = unreadChatCountFor(o.id); return c > 0 ? ` · ${c}` : ''; })()}</button>
       ${withActions && nextAction ? `<button class="btn btn-primary btn-sm" data-action="biz-advance-order" data-order-id="${o.id}" data-next="${nextAction}">${BIZ_ORDER_STATUS_ACTION_LABEL[o.status]}</button>` : ''}
       ${withActions && o.status === 'placed' ? `<button class="btn btn-danger btn-sm" data-action="biz-cancel-order" data-order-id="${o.id}">Cancel</button>` : ''}
     </div>
@@ -3828,8 +3834,59 @@ function openSupportConversation(ticketId) {
   openOrderChat(key, { supportTicketId: t.id, forcedChannel: channel });
 }
 
+/* Count unread chat notifications for a given order (any channel). */
+function unreadChatCountFor(orderId) {
+  return DB.notifications.filter((n) =>
+    !n.read && n.linkType === 'chat' && n.linkId === orderId
+  ).length;
+}
+
+/* Return { count, lastBody, lastFrom } for the most recent chat notification
+   tied to an order. Falls back to the last message the app has cached. */
+function chatPreviewFor(orderId) {
+  const notifs = DB.notifications.filter((n) =>
+    n.linkType === 'chat' && n.linkId === orderId
+  );
+  if (!notifs.length) {
+    // Fall back to any cached messages we have for this order.
+    const cached = _chatAllMessages.filter((m) => m.orderId === orderId);
+    if (cached.length) {
+      const last = cached[cached.length - 1];
+      return { count: 0, lastBody: last.body, lastFrom: last.senderName || '' };
+    }
+    return null;
+  }
+  const unread = notifs.filter((n) => !n.read);
+  // Sort by time desc — most recent first.
+  const sorted = notifs.slice().sort((a, b) => new Date(b.time) - new Date(a.time));
+  const newest = sorted[0];
+  return {
+    count: unread.length,
+    lastBody: newest.body || '',
+    lastFrom: '', // notification body already carries "Name: message" prefix when present
+  };
+}
+
 function orderChatButton(orderId, label) {
-  return `<button class="btn btn-outline btn-block" data-action="open-order-chat" data-order-id="${orderId}">${ICONS.bell2 || ''} ${escapeHtml(label || 'Message')}</button>`;
+  const preview = chatPreviewFor(orderId);
+  const unread = preview ? preview.count : 0;
+  const badge = unread > 0
+    ? `<span class="chat-unread-badge">${unread}</span>`
+    : '';
+  const previewLine = (preview && preview.lastBody)
+    ? `<div class="chat-preview-line">${escapeHtml(preview.lastBody.slice(0, 80))}${preview.lastBody.length > 80 ? '…' : ''}</div>`
+    : '';
+  const buttonClass = unread > 0 ? 'btn-primary' : 'btn-outline';
+  return `
+    <div class="chat-button-wrap">
+      <button class="btn ${buttonClass} btn-block chat-button" data-action="open-order-chat" data-order-id="${orderId}">
+        ${ICONS.bell2 || ''}
+        <span>${escapeHtml(label || 'Message')}</span>
+        ${badge}
+      </button>
+      ${previewLine}
+    </div>
+  `;
 }
 
 /* ==========================================================================
