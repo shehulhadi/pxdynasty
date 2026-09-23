@@ -2161,9 +2161,17 @@ function agentActiveDelivery(agent) {
             <div class="row-card-sub">${escapeHtml(ORDER_FLOW_LABEL[o.status] || o.status)} · ${formatNaira(o.financial.agentPayment)}</div>
             <div class="row-card-actions">
               <button class="btn btn-outline btn-sm" data-action="agent-promote-order" data-order-id="${o.id}">Focus this order</button>
+              <button class="btn btn-danger btn-sm" data-action="agent-release-order" data-order-id="${o.id}">Release</button>
             </div>
           </div>`;
         }).join('')}
+      </div>
+    ` : ''}
+
+    ${stage === 'agent_assigned' ? `
+      <div class="mt-12">
+        <button class="btn btn-outline btn-block" style="color:var(--color-error);border-color:var(--color-error);" data-action="agent-release-order" data-order-id="${active.id}">Release this order back to the pool</button>
+        <p class="text-sm text-faint" style="margin-top:8px;text-align:center;">Only possible before you pick up.</p>
       </div>
     ` : ''}
 
@@ -3306,6 +3314,50 @@ function handleAction(el, ev) {
     case 'agent-confirm-pickup': updateOrderStatus(el.dataset.orderId, 'picked_up'); render(); toast('Pickup confirmed', 'success'); break;
     case 'agent-start-transit': updateOrderStatus(el.dataset.orderId, 'out_for_delivery'); render(); toast('On the way to customer', 'success'); break;
     case 'agent-open-otp': openOtpModal(el.dataset.orderId); break;
+    case 'agent-release-order': {
+      const id = el.dataset.orderId;
+      const order = getOrder(id);
+      if (!order) break;
+      if (order.agentId !== state.currentAgentId) {
+        toast('You are not assigned to this order', 'error');
+        break;
+      }
+      if (order.status !== 'agent_assigned') {
+        toast('You can only release an order before pickup', 'error');
+        break;
+      }
+      confirmDialog(
+        'Release this order?',
+        'The order goes back to the pool so another agent can take it. You will not be paid for it.',
+        'Yes, release',
+        () => {
+          order.agentId = null;
+          order.status = 'ready_for_pickup';
+          order.statusHistory = order.statusHistory || [];
+          order.statusHistory.push({ status: 'ready_for_pickup', time: new Date().toISOString(), note: 'Released by agent' });
+          saveDataLocalOnly();
+          if (window.PXDynastySBC && window.PXDynastySBC.upsertOrder) {
+            window.PXDynastySBC.upsertOrder(order).catch(() => {});
+          }
+          // Notify business + admin.
+          pushNotification('business', order.businessId, 'Agent released order', `Order ${order.orderNumber} is back in the pool and ready for another agent.`, 'bike');
+          pushNotification('admin', null, 'Agent released order', `${order.orderNumber} released back to the pool.`, 'flag');
+          // Clear the agent's focus if it was on this order.
+          const a = getAgent(state.currentAgentId);
+          if (a && a.focusedOrderId === id) {
+            a.focusedOrderId = null;
+            saveDataLocalOnly();
+            if (window.PXDynastySBC && window.PXDynastySBC.upsertAgent) {
+              window.PXDynastySBC.upsertAgent(a).catch(() => {});
+            }
+          }
+          toast('Order released back to the pool', 'success');
+          render();
+        },
+        true
+      );
+      break;
+    }
     case 'agent-promote-order': {
       const id = el.dataset.orderId;
       const a = getAgent(state.currentAgentId);
