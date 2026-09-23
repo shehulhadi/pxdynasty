@@ -261,6 +261,9 @@ function openModal(html) {
   overlay.classList.add('open');
 }
 function closeModal() {
+  // Clear any chat polling if a chat modal was open.
+  if (typeof stopChatPolling === 'function') stopChatPolling();
+  _chatOrderId = null;
   document.getElementById('modal-root').classList.remove('open');
   document.getElementById('modal-root').innerHTML = '';
 }
@@ -1332,7 +1335,7 @@ function customerOrderTracking(orderId) {
 
     <div class="flex gap-10 mt-16">
       <button class="btn btn-outline btn-block" data-action="nav" data-view="customer-order-detail" data-order-id="${order.id}">Order details</button>
-      <button class="btn btn-primary btn-block" data-action="contact-support">Contact support</button>
+      ${orderChatButton(order.id, 'Chat with business')}
     </div>
   `;
 }
@@ -1393,6 +1396,7 @@ function customerOrderDetail(orderId) {
     <div class="flex gap-10 mt-16">
       ${!['delivered', 'cancelled'].includes(order.status) ? `<button class="btn btn-primary btn-block" data-action="nav" data-view="order-tracking" data-order-id="${order.id}">Track order</button>` : `<button class="btn btn-accent btn-block" data-action="reorder" data-order-id="${order.id}">Reorder</button>`}
     </div>
+    <div class="mt-12">${orderChatButton(order.id, 'Chat about this order')}</div>
   `;
 }
 
@@ -1603,6 +1607,7 @@ function businessOrderDetail(orderId) {
         <div class="card"><strong style="font-size:13px;">Timeline</strong>
           <div class="timeline mt-12">${order.statusHistory.map((h, i) => `<div class="timeline-step done"><div class="rail"><div class="node">${ICONS.check}</div>${i < order.statusHistory.length - 1 ? '<div class="line"></div>' : ''}</div><div class="content"><div class="t-title">${ORDER_FLOW_LABEL[h.status] || h.status}</div><div class="t-time">${formatDate(h.time)}</div></div></div>`).join('')}</div>
         </div>
+        <div class="mt-12">${orderChatButton(order.id, 'Chat about this order')}</div>
         ${nextAction ? `<button class="btn btn-primary btn-block mt-12" data-action="biz-advance-order" data-order-id="${order.id}" data-next="${nextAction}">${BIZ_ORDER_STATUS_ACTION_LABEL[order.status]}</button>` : ''}
         ${order.status === 'agent_assigned' && !order.agentId ? `<button class="btn btn-outline btn-block mt-8" data-action="biz-request-agent" data-order-id="${order.id}">Request a delivery agent</button>` : ''}
         ${order.status !== 'cancelled' && order.status !== 'delivered' ? `<button class="btn btn-danger btn-block mt-8" data-action="biz-cancel-order" data-order-id="${order.id}">Cancel order</button>` : ''}
@@ -1930,6 +1935,8 @@ function agentActiveDelivery(agent) {
         <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-accent-dark);">The customer confirms receipt from their own app once you hand over the order. You'll see the order complete automatically.</p>
       </div>
     ` : ''}
+
+    <div class="mt-12">${orderChatButton(active.id, 'Message customer / business')}</div>
 
     <div class="sticky-bottom-bar">
       ${stage === 'agent_assigned' ? `<button class="btn btn-primary btn-block" data-action="agent-confirm-pickup" data-order-id="${active.id}">Confirm pickup from business</button>` : ''}
@@ -2305,6 +2312,7 @@ function adminOrderDetail(orderId) {
   return `
     ${backBtn('Orders')}
     <div class="page-head"><div><h1>${o.orderNumber}</h1><div class="sub">${formatDate(o.createdAt)}</div></div>${orderStatusBadge(o.status)}</div>
+    <div class="mt-0 mb-12" style="margin-bottom:12px;">${orderChatButton(o.id, 'Open order chat')}</div>
     <div class="grid-2">
       <div>
         <div class="card">
@@ -2743,6 +2751,151 @@ async function loadStaffList() {
 }
 
 /* ==========================================================================
+   ORDER CHAT — per-order messaging between customer, business, agent, admin
+   ========================================================================== */
+
+let _chatOrderId = null;
+let _chatPollTimer = null;
+let _chatLastIds = new Set();
+
+function currentSenderInfo() {
+  const u = window.PXDynastyAuth && window.PXDynastyAuth.currentUserSync && window.PXDynastyAuth.currentUserSync();
+  if (u) {
+    let name = u.name || u.email || 'User';
+    let role = u.role;
+    if (role === 'business' && state.currentBusinessId) {
+      const b = getBusiness(state.currentBusinessId);
+      if (b && b.name) name = b.name;
+    } else if (role === 'agent' && state.currentAgentId) {
+      const a = getAgent(state.currentAgentId);
+      if (a && a.name) name = a.name;
+    } else if (role === 'admin') {
+      name = 'Platform Admin';
+    } else if (role === 'staff' && state.currentBusinessId) {
+      const b = getBusiness(state.currentBusinessId);
+      if (b) name = (u.name || 'Staff') + ' · ' + b.name;
+    }
+    return { id: u.id || ('u-' + role), role, name };
+  }
+  // Fallback — no auth module.
+  return { id: 'anon-' + state.role, role: state.role, name: state.role };
+}
+
+function stopChatPolling() {
+  if (_chatPollTimer) { clearInterval(_chatPollTimer); _chatPollTimer = null; }
+}
+
+function renderChatMessages(messages) {
+  const wrap = document.getElementById('chat-messages');
+  if (!wrap) return;
+  const me = currentSenderInfo();
+  if (!messages.length) {
+    wrap.innerHTML = '<div class="text-sm text-muted" style="text-align:center;padding:20px 6px;">No messages yet. Say something to get started.</div>';
+    return;
+  }
+  wrap.innerHTML = messages.map((m) => {
+    const mine = m.senderId === me.id || (m.senderRole === me.role && m.senderName === me.name);
+    return `<div style="display:flex;flex-direction:column;align-items:${mine ? 'flex-end' : 'flex-start'};margin-bottom:10px;">
+      <div style="font-size:11px;color:var(--color-text-faint);margin-bottom:3px;">${escapeHtml(m.senderName || m.senderRole || 'User')} · ${timeAgo(m.createdAt)}</div>
+      <div style="max-width:80%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.4;${mine
+        ? 'background:var(--color-primary);color:#fff;border-bottom-right-radius:3px;'
+        : 'background:var(--color-surface-alt);color:var(--color-text);border-bottom-left-radius:3px;'}">${escapeHtml(m.body)}</div>
+    </div>`;
+  }).join('');
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+async function loadChatMessages(orderId) {
+  if (!window.PXDynastySBC || !window.PXDynastySBC.fetchMessages) return;
+  const messages = await window.PXDynastySBC.fetchMessages(orderId);
+  // Only re-render if the set changed, so we don't steal scroll position.
+  const ids = new Set(messages.map((m) => m.id));
+  if (ids.size === _chatLastIds.size) {
+    let same = true;
+    for (const id of ids) { if (!_chatLastIds.has(id)) { same = false; break; } }
+    if (same) return;
+  }
+  _chatLastIds = ids;
+  renderChatMessages(messages);
+}
+
+function openOrderChat(orderId) {
+  const order = getOrder(orderId);
+  if (!order) { toast('Order not found', 'error'); return; }
+  stopChatPolling();
+  _chatOrderId = orderId;
+  _chatLastIds = new Set();
+
+  openModal(`
+    <div class="modal-head">
+      <div>
+        <h3>Order chat · ${escapeHtml(order.orderNumber)}</h3>
+        <div class="text-sm text-muted" style="margin-top:2px;">${escapeHtml((getBusiness(order.businessId) || {}).name || '')}</div>
+      </div>
+      <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
+    </div>
+    <div id="chat-messages" style="max-height:340px;overflow-y:auto;padding:10px 4px 6px;border-radius:var(--radius-sm);background:var(--color-bg);"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <input type="text" id="chat-input" placeholder="Type a message…" style="flex:1;" autocomplete="off" />
+      <button class="btn btn-primary" data-action="chat-send" data-order-id="${order.id}">${ICONS.send || ''} Send</button>
+    </div>
+  `);
+
+  loadChatMessages(orderId);
+  _chatPollTimer = setInterval(() => loadChatMessages(orderId), 4000);
+
+  // Enter to send.
+  const input = document.getElementById('chat-input');
+  if (input) {
+    input.focus();
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const btn = document.querySelector('[data-action="chat-send"]');
+        if (btn) btn.click();
+      }
+    });
+  }
+}
+
+async function sendChatMessage(orderId) {
+  const input = document.getElementById('chat-input');
+  if (!input) return;
+  const body = String(input.value || '').trim();
+  if (!body) return;
+  const me = currentSenderInfo();
+  const msg = {
+    id: 'msg-' + Math.random().toString(36).slice(2, 10),
+    orderId,
+    senderId: me.id,
+    senderRole: me.role,
+    senderName: me.name,
+    body,
+    createdAt: new Date().toISOString(),
+  };
+  input.value = '';
+  // Optimistic render
+  const wrap = document.getElementById('chat-messages');
+  if (wrap) {
+    wrap.insertAdjacentHTML('beforeend', `<div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:10px;">
+      <div style="font-size:11px;color:var(--color-text-faint);margin-bottom:3px;">${escapeHtml(me.name)} · just now</div>
+      <div style="max-width:80%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.4;background:var(--color-primary);color:#fff;border-bottom-right-radius:3px;">${escapeHtml(body)}</div>
+    </div>`);
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+  if (window.PXDynastySBC && window.PXDynastySBC.insertMessage) {
+    const r = await window.PXDynastySBC.insertMessage(msg);
+    if (!r.ok) toast('Message failed to send: ' + (r.error || ''), 'error');
+  } else {
+    toast('Message service unavailable', 'error');
+  }
+}
+
+function orderChatButton(orderId, label) {
+  return `<button class="btn btn-outline btn-block" data-action="open-order-chat" data-order-id="${orderId}">${ICONS.bell2 || ''} ${escapeHtml(label || 'Message')}</button>`;
+}
+
+/* ==========================================================================
    14. EVENT DELEGATION
    ========================================================================== */
 
@@ -3138,6 +3291,8 @@ function handleAction(el, ev) {
       });
       break;
     }
+    case 'open-order-chat': openOrderChat(el.dataset.orderId); break;
+    case 'chat-send': sendChatMessage(el.dataset.orderId); break;
     case 'open-more-menu': openMoreMenu(); break;
     case 'more-nav': closeModal(); navigate(el.dataset.view); break;
     case 'do-logout':

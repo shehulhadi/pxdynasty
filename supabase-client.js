@@ -299,6 +299,49 @@ async function sbcVerifyPayment(reference, orderDrafts) {
   }
 }
 
+/* ---- Messages (order chat) ---- */
+
+function sbcRowToMessage(r) {
+  return {
+    id: r.id,
+    orderId: r.order_id,
+    senderId: r.sender_id,
+    senderRole: r.sender_role,
+    senderName: r.sender_name,
+    body: r.body,
+    createdAt: r.created_at,
+  };
+}
+function sbcMessageToRow(m) {
+  return {
+    id: m.id,
+    order_id: m.orderId,
+    sender_id: m.senderId,
+    sender_role: m.senderRole,
+    sender_name: m.senderName,
+    body: m.body,
+  };
+}
+
+async function sbcFetchMessages(orderId) {
+  const c = sbcInit();
+  if (!c || !orderId) return [];
+  const { data, error } = await c.from('messages')
+    .select('*')
+    .eq('order_id', orderId)
+    .order('created_at', { ascending: true });
+  if (error) { console.error('fetchMessages', error); return []; }
+  return (data || []).map(sbcRowToMessage);
+}
+
+async function sbcInsertMessage(msg) {
+  const c = sbcInit();
+  if (!c) return { ok: false, error: 'no client' };
+  const { error } = await c.from('messages').insert(sbcMessageToRow(msg));
+  if (error) { console.error('insertMessage', error); return { ok: false, error: error.message }; }
+  return { ok: true };
+}
+
 /* Expose globally for app.js to call. */
 window.PXDynastySBC = {
   init: sbcInit,
@@ -313,4 +356,6 @@ window.PXDynastySBC = {
   uploadProductImage: sbcUploadProductImage,
   upsertNotification: (n) => sbcUpsert('notifications', sbcNotificationToRow(n)),
   verifyPayment: sbcVerifyPayment,
+  fetchMessages: sbcFetchMessages,
+  insertMessage: sbcInsertMessage,
 };
