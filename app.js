@@ -782,6 +782,9 @@ function render() {
   if (state.role === 'admin' && state.view === 'admin-agent-detail') {
     loadAgentPayouts(state.params.id);
   }
+  if (state.role === 'admin' && state.view === 'admin-disputes') {
+    loadSupportTickets();
+  }
 }
 
 function renderView() {
@@ -2877,9 +2880,64 @@ function adminZones() {
 }
 
 function adminDisputes() {
+  const disputedOrders = getOrders({}).filter((o) => o.disputed);
+  const tickets = _supportTickets || [];
+  const openTickets = tickets.filter((t) => t.status === 'open');
+  const closedTickets = tickets.filter((t) => t.status !== 'open');
+
   return `
-    <div class="page-head"><h1>Disputes</h1></div>
-    ${emptyState('gavel', 'No disputes', 'Opened disputes will appear here for review.', null)}
+    <div class="page-head">
+      <div><h1>Support &amp; Disputes</h1><div class="sub">${disputedOrders.length} dispute${disputedOrders.length === 1 ? '' : 's'} · ${openTickets.length} open ticket${openTickets.length === 1 ? '' : 's'}</div></div>
+    </div>
+
+    <div class="section-title-row" style="margin-top:0;"><h2>Order disputes</h2></div>
+    ${disputedOrders.length ? `<div class="row-cards">
+      ${disputedOrders.map((o) => {
+        const b = getBusiness(o.businessId) || {};
+        const c = getCustomer(o.customerId) || {};
+        return `<div class="row-card pressable" style="cursor:pointer;" data-action="open-order-summary" data-order-id="${o.id}">
+          <div class="row-card-top">
+            <span class="row-card-title">${o.orderNumber}</span>
+            <span class="status-badge status-error">Disputed</span>
+          </div>
+          <div class="row-card-sub">${escapeHtml(c.name || 'Customer')} → ${escapeHtml(b.name || 'Business')}</div>
+          <div class="row-card-sub">${escapeHtml(o.disputeReason || 'Problem reported')}</div>
+          ${o.disputeDetails ? `<p class="text-sm" style="margin-top:8px;line-height:1.5;">${escapeHtml(o.disputeDetails)}</p>` : ''}
+          <div class="text-sm text-faint" style="margin-top:8px;">${timeAgo(o.disputeAt || o.createdAt)}</div>
+          <div class="row-card-actions">
+            <button class="btn btn-outline btn-sm" data-action="open-order-summary" data-order-id="${o.id}">View order</button>
+            <button class="btn btn-primary btn-sm" data-action="open-order-chat" data-order-id="${o.id}">Open chat</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : `<p class="text-sm text-muted">No order disputes open.</p>`}
+
+    <div class="section-title-row"><h2>Support tickets</h2><span class="text-sm text-muted">${openTickets.length} open</span></div>
+    ${tickets.length ? `<div class="row-cards">
+      ${[...openTickets, ...closedTickets].slice(0, 20).map((t) => {
+        const o = t.orderId ? getOrder(t.orderId) : null;
+        return `<div class="row-card">
+          <div class="row-card-top">
+            <span class="row-card-title">${escapeHtml(t.subject)}</span>
+            <span class="status-badge ${t.status === 'resolved' ? 'status-success' : 'status-warn'}">${t.status}</span>
+          </div>
+          <div class="row-card-sub">From ${escapeHtml(t.openedByName || 'User')} · ${t.openedByRole} · ${timeAgo(t.createdAt)}</div>
+          ${o ? `<div class="row-card-sub">Order ${escapeHtml(o.orderNumber)}</div>` : ''}
+          <p class="text-sm" style="margin-top:8px;line-height:1.5;">${escapeHtml(t.body)}</p>
+          ${t.adminReply ? `
+            <div style="margin-top:10px;padding:10px 12px;background:var(--color-primary-tint);border-radius:8px;">
+              <strong style="font-size:12px;color:var(--color-primary-dark);">Your reply</strong>
+              <p class="text-sm mt-4" style="margin:4px 0 0;color:var(--color-primary-dark);">${escapeHtml(t.adminReply)}</p>
+            </div>` : ''}
+          <div class="row-card-actions">
+            ${o ? `<button class="btn btn-outline btn-sm" data-action="open-order-summary" data-order-id="${o.id}">View order</button>` : ''}
+            ${t.status === 'open'
+              ? `<button class="btn btn-primary btn-sm" data-action="support-reply-open" data-id="${t.id}">Reply &amp; resolve</button>`
+              : `<button class="btn btn-outline btn-sm" data-action="support-reopen" data-id="${t.id}">Reopen</button>`}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : emptyState('gavel', 'No tickets', 'Support requests from customers, businesses, and agents appear here.', null)}
   `;
 }
 
@@ -3325,7 +3383,13 @@ function renderChatMessages() {
   }
 
   wrap.innerHTML = visible.map((m) => {
-    const mine = m.senderId === me.id || (m.senderRole === me.role && m.senderName === me.name);
+    // Match by id when both are present; otherwise fall back to role + name.
+    let mine;
+    if (m.senderId && me.id) {
+      mine = m.senderId === me.id;
+    } else {
+      mine = m.senderRole === me.role && m.senderName === me.name;
+    }
     return `<div style="display:flex;flex-direction:column;align-items:${mine ? 'flex-end' : 'flex-start'};margin-bottom:10px;">
       <div style="font-size:11px;color:var(--color-text-faint);margin-bottom:3px;">${escapeHtml(m.senderName || m.senderRole || 'User')} · ${timeAgo(m.createdAt)}</div>
       <div style="max-width:80%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.4;${mine
@@ -3687,11 +3751,27 @@ async function submitSupportTicket(orderId) {
   }
   _supportTickets.unshift(ticket);
 
+  // ALSO post the ticket into the admin-cust channel of the order (if there is one)
+  // so the whole conversation lives in the order chat as well.
+  if (orderId && window.PXDynastySBC && window.PXDynastySBC.insertMessage) {
+    const chatMsg = {
+      id: 'msg-' + Math.random().toString(36).slice(2, 10),
+      orderId,
+      channel: 'admin-cust',
+      senderId: me.id,
+      senderRole: me.role,
+      senderName: me.name,
+      body: '[' + subject + '] ' + body,
+      createdAt: new Date().toISOString(),
+    };
+    window.PXDynastySBC.insertMessage(chatMsg).catch(() => {});
+  }
+
   pushNotification('admin', null, 'New support ticket', `${subject} — from ${me.name}`, 'gavel');
 
   closeModal();
   toast('Support ticket submitted', 'success');
-  if (state.role === 'admin' && state.view === 'admin-support') render();
+  if (state.role === 'admin' && (state.view === 'admin-support' || state.view === 'admin-disputes')) render();
 }
 
 async function loadSupportTickets() {
@@ -3788,6 +3868,20 @@ async function sendSupportReply(ticketId) {
     pushNotification('business', t.openedById, 'Support replied', reply.slice(0, 80), 'checkCircle');
   } else if (t.openedByRole === 'agent') {
     pushNotification('agent', t.openedById, 'Support replied', reply.slice(0, 80), 'checkCircle');
+  }
+  // Mirror the reply into the order's admin-cust chat channel.
+  if (t.orderId && window.PXDynastySBC && window.PXDynastySBC.insertMessage) {
+    const me2 = currentSenderInfo();
+    window.PXDynastySBC.insertMessage({
+      id: 'msg-' + Math.random().toString(36).slice(2, 10),
+      orderId: t.orderId,
+      channel: 'admin-cust',
+      senderId: me2.id,
+      senderRole: me2.role,
+      senderName: me2.name,
+      body: '[Support reply] ' + reply,
+      createdAt: new Date().toISOString(),
+    }).catch(() => {});
   }
   closeModal();
   toast('Reply sent and ticket resolved', 'success');
