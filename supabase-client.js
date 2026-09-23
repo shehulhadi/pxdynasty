@@ -352,6 +352,76 @@ async function sbcInsertMessage(msg) {
   return { ok: true };
 }
 
+/* ---- Support tickets ---- */
+
+function sbcRowToTicket(r) {
+  return {
+    id: r.id,
+    orderId: r.order_id,
+    openedById: r.opened_by_id,
+    openedByRole: r.opened_by_role,
+    openedByName: r.opened_by_name,
+    subject: r.subject,
+    body: r.body,
+    status: r.status || 'open',
+    adminReply: r.admin_reply,
+    repliedAt: r.replied_at,
+    repliedBy: r.replied_by,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+function sbcTicketToRow(t) {
+  return {
+    id: t.id,
+    order_id: t.orderId || null,
+    opened_by_id: t.openedById || null,
+    opened_by_role: t.openedByRole || null,
+    opened_by_name: t.openedByName || null,
+    subject: t.subject,
+    body: t.body || '',
+    status: t.status || 'open',
+    admin_reply: t.adminReply || null,
+    replied_at: t.repliedAt || null,
+    replied_by: t.repliedBy || null,
+  };
+}
+
+async function sbcFetchTickets() {
+  const c = sbcInit();
+  if (!c) return [];
+  const { data, error } = await c.from('support_tickets')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) { console.error('fetchTickets', error); return []; }
+  return (data || []).map(sbcRowToTicket);
+}
+
+async function sbcInsertTicket(t) {
+  const c = sbcInit();
+  if (!c) return { ok: false, error: 'no client' };
+  const { error } = await c.from('support_tickets').insert(sbcTicketToRow(t));
+  if (error) { console.error('insertTicket', error); return { ok: false, error: error.message }; }
+  return { ok: true };
+}
+
+async function sbcUpdateTicket(id, patch) {
+  const c = sbcInit();
+  if (!c) return { ok: false, error: 'no client' };
+  const row = sbcTicketToRow(Object.assign({ id }, patch));
+  // Drop fields not meant to change here.
+  delete row.id;
+  delete row.opened_by_id;
+  delete row.opened_by_role;
+  delete row.opened_by_name;
+  delete row.subject;
+  row.updated_at = new Date().toISOString();
+  const { error } = await c.from('support_tickets').update(row).eq('id', id);
+  if (error) { console.error('updateTicket', error); return { ok: false, error: error.message }; }
+  return { ok: true };
+}
+
 /* Expose globally for app.js to call. */
 window.PXDynastySBC = {
   init: sbcInit,
@@ -368,4 +438,7 @@ window.PXDynastySBC = {
   verifyPayment: sbcVerifyPayment,
   fetchMessages: sbcFetchMessages,
   insertMessage: sbcInsertMessage,
+  fetchTickets: sbcFetchTickets,
+  insertTicket: sbcInsertTicket,
+  updateTicket: sbcUpdateTicket,
 };

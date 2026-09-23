@@ -147,6 +147,8 @@ async function hydrateDb() {
   if (remote.notifications) DB.notifications = remote.notifications;
   // Mirror into local cache too.
   saveDataLocalOnly();
+  // Support tickets load in the background.
+  loadSupportTickets();
   return true;
 }
 
@@ -675,6 +677,7 @@ const ADMIN_NAV = [
   { id: 'admin-commissions', label: 'Commissions', icon: 'money' },
   { id: 'admin-zones', label: 'Delivery zones', icon: 'location' },
   { id: 'admin-disputes', label: 'Disputes', icon: 'gavel' },
+  { id: 'admin-support', label: 'Support', icon: 'bell2' },
   { id: 'admin-reports', label: 'Reports', icon: 'chart' },
   { id: 'admin-settings', label: 'Settings', icon: 'cog' },
 ];
@@ -772,6 +775,9 @@ function render() {
   bindHeaderSearch();
   if (state.role === 'business' && state.view === 'biz-team') {
     loadStaffList();
+  }
+  if (state.role === 'admin' && state.view === 'admin-support') {
+    loadSupportTickets();
   }
 }
 
@@ -2351,6 +2357,7 @@ function renderAdminView() {
     case 'admin-zones': return adminZones();
     case 'admin-disputes': return adminDisputes();
     case 'admin-reports': return adminReports();
+    case 'admin-support': return adminSupport();
     case 'admin-settings': return adminSettingsView();
     case 'notifications': return notificationsView();
     default: return adminDashboard();
@@ -3405,6 +3412,197 @@ function orderChatButton(orderId, label) {
 }
 
 /* ==========================================================================
+   SUPPORT — tickets raised by any role, visible to admin
+   ========================================================================== */
+
+let _supportTickets = [];
+
+function currentSupportSender() {
+  const me = currentSenderInfo();
+  return me;
+}
+
+function openContactSupportModal(orderId) {
+  const me = currentSupportSender();
+  const order = orderId ? getOrder(orderId) : null;
+
+  openModal(`
+    <div class="modal-head">
+      <h3>Contact support</h3>
+      <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
+    </div>
+    <p class="text-sm text-muted">
+      ${order ? `About order <strong>${escapeHtml(order.orderNumber)}</strong>.` : 'Tell us what went wrong and our team will follow up.'}
+    </p>
+    <div class="form-group mt-12">
+      <label>Category</label>
+      <select id="sup-subject">
+        <option value="Order not delivered">Order not delivered</option>
+        <option value="Wrong or missing items">Wrong or missing items</option>
+        <option value="Payment issue">Payment issue</option>
+        <option value="Delivery agent behaviour">Delivery agent behaviour</option>
+        <option value="Refund request">Refund request</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Details</label>
+      <textarea id="sup-body" placeholder="Describe what happened…" style="min-height:100px;"></textarea>
+    </div>
+    <div class="auth-error" id="sup-error"></div>
+    <button class="btn btn-primary btn-block mt-12" data-action="support-submit" data-order-id="${orderId || ''}">Submit to support</button>
+  `);
+}
+
+async function submitSupportTicket(orderId) {
+  const me = currentSupportSender();
+  const subject = (document.getElementById('sup-subject') || {}).value || 'Other';
+  const body = ((document.getElementById('sup-body') || {}).value || '').trim();
+  const errEl = document.getElementById('sup-error');
+  if (!body) { if (errEl) errEl.textContent = 'Please describe the issue.'; return; }
+
+  const ticket = {
+    id: 'sup-' + Math.random().toString(36).slice(2, 10),
+    orderId: orderId || null,
+    openedById: me.id,
+    openedByRole: me.role,
+    openedByName: me.name,
+    subject,
+    body,
+    status: 'open',
+    createdAt: new Date().toISOString(),
+  };
+
+  if (window.PXDynastySBC && window.PXDynastySBC.insertTicket) {
+    const r = await window.PXDynastySBC.insertTicket(ticket);
+    if (!r.ok) { if (errEl) errEl.textContent = 'Failed: ' + (r.error || ''); return; }
+  }
+  _supportTickets.unshift(ticket);
+
+  pushNotification('admin', null, 'New support ticket', `${subject} — from ${me.name}`, 'gavel');
+
+  closeModal();
+  toast('Support ticket submitted', 'success');
+  if (state.role === 'admin' && state.view === 'admin-support') render();
+}
+
+async function loadSupportTickets() {
+  if (!window.PXDynastySBC || !window.PXDynastySBC.fetchTickets) return;
+  _supportTickets = await window.PXDynastySBC.fetchTickets();
+  if (state.role === 'admin' && state.view === 'admin-support') render();
+}
+
+function adminSupport() {
+  const openCount = _supportTickets.filter((t) => t.status === 'open').length;
+  const resolvedCount = _supportTickets.filter((t) => t.status === 'resolved').length;
+  const filterStatus = state.params.status || 'open';
+  const list = filterStatus === 'all' ? _supportTickets : _supportTickets.filter((t) => t.status === filterStatus);
+
+  return `
+    <div class="page-head"><h1>Support</h1><div class="sub">${openCount} open · ${resolvedCount} resolved</div></div>
+    <div class="tab-bar">
+      ${[['open','Open (' + openCount + ')'], ['resolved','Resolved (' + resolvedCount + ')'], ['all','All']].map(([id, label]) => `<button class="${filterStatus === id ? 'active' : ''}" data-action="admin-support-filter" data-status="${id}">${label}</button>`).join('')}
+    </div>
+    ${list.length ? `<div class="row-cards">
+      ${list.map((t) => {
+        const o = t.orderId ? getOrder(t.orderId) : null;
+        return `
+          <div class="row-card">
+            <div class="row-card-top">
+              <span class="row-card-title">${escapeHtml(t.subject)}</span>
+              <span class="status-badge ${t.status === 'resolved' ? 'status-success' : 'status-warn'}">${t.status}</span>
+            </div>
+            <div class="row-card-sub">From ${escapeHtml(t.openedByName || 'User')} · ${t.openedByRole} · ${timeAgo(t.createdAt)}</div>
+            ${o ? `<div class="row-card-sub">Order ${escapeHtml(o.orderNumber)}</div>` : ''}
+            <p class="text-sm" style="margin-top:8px;line-height:1.5;">${escapeHtml(t.body)}</p>
+            ${t.adminReply ? `
+              <div style="margin-top:10px;padding:10px 12px;background:var(--color-primary-tint);border-radius:8px;">
+                <strong style="font-size:12px;color:var(--color-primary-dark);">Your reply</strong>
+                <p class="text-sm mt-4" style="margin:4px 0 0;color:var(--color-primary-dark);">${escapeHtml(t.adminReply)}</p>
+                <div class="text-sm mt-4" style="color:var(--color-primary-dark);opacity:.7;">${timeAgo(t.repliedAt)}</div>
+              </div>` : ''}
+            <div class="row-card-actions">
+              ${o ? `<button class="btn btn-outline btn-sm" data-action="open-order-summary" data-order-id="${o.id}">View order</button>` : ''}
+              ${t.status === 'open'
+                ? `<button class="btn btn-primary btn-sm" data-action="support-reply-open" data-id="${t.id}">Reply &amp; resolve</button>`
+                : `<button class="btn btn-outline btn-sm" data-action="support-reopen" data-id="${t.id}">Reopen</button>`}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>` : emptyState('gavel', 'No tickets here', 'Support requests from customers, businesses, and agents will show up here.', null)}
+  `;
+}
+
+function openSupportReplyModal(ticketId) {
+  const t = _supportTickets.find((x) => x.id === ticketId);
+  if (!t) { toast('Ticket not found', 'error'); return; }
+  openModal(`
+    <div class="modal-head">
+      <h3>Reply to ticket</h3>
+      <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
+    </div>
+    <p class="text-sm text-muted"><strong>${escapeHtml(t.subject)}</strong> from ${escapeHtml(t.openedByName || 'user')}</p>
+    <p class="text-sm" style="padding:10px 12px;background:var(--color-surface-alt);border-radius:8px;margin-top:10px;line-height:1.5;">${escapeHtml(t.body)}</p>
+    <div class="form-group mt-12">
+      <label>Your reply</label>
+      <textarea id="sup-reply" placeholder="Type your response to the user…" style="min-height:100px;"></textarea>
+    </div>
+    <div class="auth-error" id="sup-reply-error"></div>
+    <div class="flex gap-8 mt-12">
+      <button class="btn btn-outline btn-block" data-action="close-modal">Cancel</button>
+      <button class="btn btn-primary btn-block" data-action="support-reply-send" data-id="${t.id}">Send &amp; resolve</button>
+    </div>
+  `);
+}
+
+async function sendSupportReply(ticketId) {
+  const t = _supportTickets.find((x) => x.id === ticketId);
+  if (!t) return;
+  const reply = ((document.getElementById('sup-reply') || {}).value || '').trim();
+  const errEl = document.getElementById('sup-reply-error');
+  if (!reply) { if (errEl) errEl.textContent = 'Write a reply first.'; return; }
+  const me = currentSenderInfo();
+  const patch = {
+    adminReply: reply,
+    repliedAt: new Date().toISOString(),
+    repliedBy: me.name || 'Admin',
+    status: 'resolved',
+  };
+  if (window.PXDynastySBC && window.PXDynastySBC.updateTicket) {
+    const r = await window.PXDynastySBC.updateTicket(ticketId, patch);
+    if (!r.ok) { if (errEl) errEl.textContent = 'Failed: ' + (r.error || ''); return; }
+  }
+  Object.assign(t, patch);
+  // Notify the person who opened the ticket.
+  if (t.openedByRole === 'customer' && t.openedById) {
+    pushNotification('customer', t.openedById, 'Support replied', reply.slice(0, 80), 'checkCircle');
+  } else if (t.openedByRole === 'business') {
+    pushNotification('business', t.openedById, 'Support replied', reply.slice(0, 80), 'checkCircle');
+  } else if (t.openedByRole === 'agent') {
+    pushNotification('agent', t.openedById, 'Support replied', reply.slice(0, 80), 'checkCircle');
+  }
+  closeModal();
+  toast('Reply sent and ticket resolved', 'success');
+  render();
+}
+
+async function reopenSupportTicket(ticketId) {
+  const t = _supportTickets.find((x) => x.id === ticketId);
+  if (!t) return;
+  if (window.PXDynastySBC && window.PXDynastySBC.updateTicket) {
+    await window.PXDynastySBC.updateTicket(ticketId, { status: 'open' });
+  }
+  t.status = 'open';
+  toast('Ticket reopened', 'success');
+  render();
+}
+
+/* Admin support badge count (open tickets). */
+function adminSupportOpenCount() {
+  return _supportTickets.filter((t) => t.status === 'open').length;
+}
+
+/* ==========================================================================
    14. EVENT DELEGATION
    ========================================================================== */
 
@@ -3508,7 +3706,7 @@ function handleAction(el, ev) {
       navigate('cart');
       break;
     }
-    case 'contact-support': toast('Support contact coming soon', 'info'); break;
+    case 'contact-support': openContactSupportModal(el.dataset.orderId || state.params.orderId || null); break;
     case 'call-agent': toast('Calling delivery agent...', 'info'); break;
 
     case 'biz-orders-filter': navigate('biz-orders', { status: el.dataset.status }); break;
@@ -3898,6 +4096,11 @@ function handleAction(el, ev) {
     case 'open-order-summary': openOrderSummary(el.dataset.orderId); break;
     case 'open-order-chat': openOrderChat(el.dataset.orderId); break;
     case 'chat-set-channel': setChatChannel(el.dataset.channel); break;
+    case 'support-submit': submitSupportTicket(el.dataset.orderId || null); break;
+    case 'admin-support-filter': navigate('admin-support', { status: el.dataset.status }); break;
+    case 'support-reply-open': openSupportReplyModal(el.dataset.id); break;
+    case 'support-reply-send': sendSupportReply(el.dataset.id); break;
+    case 'support-reopen': reopenSupportTicket(el.dataset.id); break;
     case 'mark-all-read': {
       const refId = state.role === 'customer' ? state.currentCustomerId : state.role === 'business' ? state.currentBusinessId : state.role === 'agent' ? state.currentAgentId : null;
       DynastyllRead(state.role, refId).then(() => {
