@@ -1768,6 +1768,15 @@ function businessOverview(biz) {
     <div class="page-head"><div><h1>Overview</h1><div class="sub">${escapeHtml(biz.name)}</div></div>
       <button class="btn btn-primary btn-sm" data-action="nav" data-view="biz-add-product">${ICONS.plus} Add product</button>
     </div>
+
+    <div class="card" style="display:flex;align-items:center;gap:12px;background:var(--color-surface-alt);">
+      <div class="logo-sq" style="width:44px;height:44px;font-size:14px;">${escapeHtml(initials(biz.name))}</div>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:14px;">Edit your store profile</div>
+        <div class="text-sm text-muted">Add a cover photo, description, tags, and hours</div>
+      </div>
+      <button class="btn btn-outline btn-sm" data-action="nav" data-view="biz-store">Open</button>
+    </div>
     <div class="metric-grid">
       ${metricCard('Today\'s sales', formatNaira(today.reduce((s, o) => s + o.subtotal, 0)), today.length + ' orders today')}
       ${metricCard('Pending orders', pending.length, 'need action')}
@@ -4222,19 +4231,45 @@ async function shareNative(data) {
     text: data.text || '',
     url: data.url || location.origin + location.pathname,
   };
+
+  // Try native share sheet first.
   if (navigator.share) {
-    try { await navigator.share(payload); return true; }
-    catch (e) {
+    try {
+      await navigator.share(payload);
+      return true;
+    } catch (e) {
       if (e && e.name === 'AbortError') return false;
-      // Fall through to clipboard.
+      // Fall through to manual fallback.
     }
   }
+
+  // Clipboard fallback.
+  const fullText = (payload.text ? payload.text + '\n\n' : '') + payload.url;
+  let copied = false;
   try {
-    await navigator.clipboard.writeText((payload.text ? payload.text + '\n' : '') + payload.url);
-    toast('Link copied to clipboard', 'success');
-  } catch (_) {
-    prompt('Copy this link:', payload.url);
-  }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(fullText);
+      copied = true;
+    }
+  } catch (_) { /* ignore */ }
+
+  // If we got here, native share failed. Show the user the link either way.
+  openModal(`
+    <div class="modal-head">
+      <h3>Share</h3>
+      <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
+    </div>
+    <p class="text-sm text-muted">${copied ? 'Link copied to your clipboard. Paste it anywhere.' : 'Copy this link:'}</p>
+    <div class="form-group mt-12">
+      <label>Link</label>
+      <input type="text" id="share-manual-input" value="${escapeHtml(payload.url)}" readonly onclick="this.select()" />
+    </div>
+    <div class="flex gap-8 mt-12">
+      <button class="btn btn-outline btn-block" data-action="share-manual-copy">Copy link</button>
+      <button class="btn btn-primary btn-block" data-action="close-modal">Done</button>
+    </div>
+  `);
+  if (copied) toast('Link copied', 'success');
   return true;
 }
 
@@ -4782,6 +4817,19 @@ function handleAction(el, ev) {
     case 'open-order-chat': openOrderChat(el.dataset.orderId); break;
     case 'chat-set-channel': setChatChannel(el.dataset.channel); break;
     case 'share-product': shareProduct(el.dataset.id); break;
+    case 'share-manual-copy': {
+      const inp = document.getElementById('share-manual-input');
+      if (!inp) break;
+      inp.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      if (!ok && navigator.clipboard) {
+        navigator.clipboard.writeText(inp.value).catch(() => {});
+        ok = true;
+      }
+      toast(ok ? 'Copied' : 'Select the text and copy manually', ok ? 'success' : 'info');
+      break;
+    }
     case 'biz-save-profile': {
       const biz = getBusiness(state.currentBusinessId);
       if (!biz) break;
@@ -5303,6 +5351,29 @@ async function boot() {
   } else {
     render();
   }
+
+  // Deep-link handling: #product=ID, #business=ID, #order=ID
+  // Runs after the initial render so the UI is in a known state.
+  setTimeout(() => {
+    try {
+      const hash = (location.hash || '').replace(/^#/, '');
+      if (!hash) return;
+      const [key, val] = hash.split('=');
+      if (!val) return;
+      const loggedIn = window.PXDynastyAuth && window.PXDynastyAuth.isLoggedIn && window.PXDynastyAuth.isLoggedIn();
+      if (!loggedIn) return; // auth flow will land them on the landing page; they can log in first
+      if (key === 'product') {
+        const p = getProduct(val);
+        if (p) { state.role = 'customer'; navigate('product', { id: p.id }); }
+      } else if (key === 'business') {
+        const b = getBusiness(val);
+        if (b) { state.role = 'customer'; navigate('business', { id: b.id }); }
+      } else if (key === 'order') {
+        const o = getOrder(val);
+        if (o) { navigate('order-tracking', { orderId: o.id }); }
+      }
+    } catch (e) { console.warn('deep-link parse failed:', e); }
+  }, 400);
 }
 
 boot();
