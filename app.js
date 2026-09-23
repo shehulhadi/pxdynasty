@@ -71,10 +71,11 @@ const CATEGORIES = [
 
 const NG_STATES_AREAS = ['Ikeja, Lagos', 'Yaba, Lagos', 'Lekki, Lagos', 'Surulere, Lagos', 'Wuse 2, Abuja', 'Garki, Abuja', 'Independence Layout, Enugu', 'GRA, Port Harcourt', 'Bodija, Ibadan', 'Sabon Gari, Kano'];
 
-const ORDER_FLOW = ['placed', 'confirmed', 'preparing', 'agent_assigned', 'picked_up', 'out_for_delivery', 'delivered'];
+const ORDER_FLOW = ['placed', 'confirmed', 'preparing', 'ready_for_pickup', 'agent_assigned', 'picked_up', 'out_for_delivery', 'delivered'];
 const ORDER_FLOW_LABEL = {
   placed: 'Order placed', confirmed: 'Business confirmed', preparing: 'Preparing order',
-  agent_assigned: 'Delivery agent assigned', picked_up: 'Picked up', out_for_delivery: 'Out for delivery', delivered: 'Delivered',
+  ready_for_pickup: 'Ready for pickup', agent_assigned: 'Delivery agent assigned',
+  picked_up: 'Picked up', out_for_delivery: 'Out for delivery', delivered: 'Delivered',
 };
 
 function categoryEmoji(cat) {
@@ -1341,7 +1342,7 @@ function customerOrderTracking(orderId) {
 }
 
 function orderStatusBadge(status) {
-  const map = { placed: 'status-info', confirmed: 'status-info', preparing: 'status-warn', agent_assigned: 'status-warn', picked_up: 'status-accent', out_for_delivery: 'status-accent', delivered: 'status-success', cancelled: 'status-error', refunded: 'status-error', disputed: 'status-error' };
+  const map = { placed: 'status-info', confirmed: 'status-info', preparing: 'status-warn', ready_for_pickup: 'status-accent', agent_assigned: 'status-warn', picked_up: 'status-accent', out_for_delivery: 'status-accent', delivered: 'status-success', cancelled: 'status-error', refunded: 'status-error', disputed: 'status-error' };
   return `<span class="status-badge ${map[status] || 'status-neutral'}">${status.replace(/_/g, ' ')}</span>`;
 }
 
@@ -1529,7 +1530,7 @@ function businessOverview(biz) {
   `;
 }
 
-const BIZ_ORDER_STATUS_STEPS = { placed: 'confirmed', confirmed: 'preparing', preparing: 'agent_assigned' };
+const BIZ_ORDER_STATUS_STEPS = { placed: 'confirmed', confirmed: 'preparing', preparing: 'ready_for_pickup' };
 const BIZ_ORDER_STATUS_ACTION_LABEL = { placed: 'Accept order', confirmed: 'Start preparing', preparing: 'Mark ready for pickup' };
 
 function businessOrders(biz) {
@@ -1539,7 +1540,7 @@ function businessOrders(biz) {
   return `
     <div class="page-head"><h1>Orders</h1></div>
     <div class="tab-bar">
-      ${[['all', 'All'], ['placed', 'New'], ['confirmed', 'Accepted'], ['preparing', 'Preparing'], ['agent_assigned', 'Ready/Assigned'], ['delivered', 'Completed'], ['cancelled', 'Cancelled']].map(([id, label]) => `<button class="${filterStatus === id ? 'active' : ''}" data-action="biz-orders-filter" data-status="${id}">${label}</button>`).join('')}
+      ${[['all', 'All'], ['placed', 'New'], ['confirmed', 'Accepted'], ['preparing', 'Preparing'], ['ready_for_pickup', 'Ready'], ['agent_assigned', 'With agent'], ['delivered', 'Completed'], ['cancelled', 'Cancelled']].map(([id, label]) => `<button class="${filterStatus === id ? 'active' : ''}" data-action="biz-orders-filter" data-status="${id}">${label}</button>`).join('')}
     </div>
     ${orders.length ? `<div class="row-cards">${orders.map((o) => businessOrderCardHtml(o, true)).join('')}</div>` : emptyState('orders', 'No orders here', 'Try a different filter.', null)}
   `;
@@ -1816,7 +1817,9 @@ function renderAgentView() {
 function distanceForOrder(order) { return (1.5 + ((order.orderNumber.slice(-2) * 1) % 9)).toFixed(1); }
 
 function agentJobs(agent) {
-  const availableOrders = getOrders({ status: 'preparing' }).filter((o) => !o.agentId).slice(0, 8);
+  const availableOrders = getOrders({ status: ['ready_for_pickup', 'preparing'] })
+    .filter((o) => !o.agentId)
+    .slice(0, 12);
   const isOffline = agent.status === 'offline';
   const todayStr = new Date().toDateString();
   const myOrders = getOrders({ agentId: agent.id });
@@ -2297,7 +2300,7 @@ function adminOrders() {
   return `
     <div class="page-head"><h1>Order management</h1><div class="sub">${list.length} orders</div></div>
     <div class="tab-bar">
-      ${['all', 'placed', 'confirmed', 'preparing', 'agent_assigned', 'picked_up', 'out_for_delivery', 'delivered', 'cancelled'].map((s) => `<button class="${filterStatus === s ? 'active' : ''}" data-action="admin-orders-filter" data-status="${s}">${s === 'all' ? 'All' : s.replace(/_/g, ' ')}</button>`).join('')}
+      ${['all', 'placed', 'confirmed', 'preparing', 'ready_for_pickup', 'agent_assigned', 'picked_up', 'out_for_delivery', 'delivered', 'cancelled'].map((s) => `<button class="${filterStatus === s ? 'active' : ''}" data-action="admin-orders-filter" data-status="${s}">${s === 'all' ? 'All' : s.replace(/_/g, ' ')}</button>`).join('')}
     </div>
     ${list.length ? `<div class="row-cards mobile-only-cards">${list.map((o) => adminOrderCardHtml(o)).join('')}</div>` : emptyState('orders', 'No orders', 'Orders will appear here once customers start buying.', null)}
   `;
@@ -2327,7 +2330,7 @@ function adminOrderDetail(orderId) {
         ${!agent && !['delivered', 'cancelled'].includes(o.status) ? `
         <div class="card mt-12">
           <strong style="font-size:13px;">Assign delivery agent</strong>
-          <select id="admin-assign-agent-select" class="mt-8">${DB.agents.filter((a) => a.status === 'online').map((a) => `<option value="${a.id}">${escapeHtml(a.name)} — ${a.vehicle}</option>`).join('') || '<option>No agents online</option>'}</select>
+          <select id="admin-assign-agent-select" class="mt-8">${DB.agents.map((a) => `<option value="${a.id}">${escapeHtml(a.name)} — ${a.vehicle}${a.status === 'offline' ? ' (offline)' : ''}</option>`).join('') || '<option>No agents registered</option>'}</select>
           <button class="btn btn-primary btn-block mt-8" data-action="admin-assign-agent" data-order-id="${o.id}">Assign agent</button>
         </div>` : ''}
       </div>
