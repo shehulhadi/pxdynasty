@@ -779,6 +779,9 @@ function render() {
   if (state.role === 'admin' && state.view === 'admin-support') {
     loadSupportTickets();
   }
+  if (state.role === 'admin' && state.view === 'admin-agent-detail') {
+    loadAgentPayouts(state.params.id);
+  }
 }
 
 function renderView() {
@@ -2526,6 +2529,20 @@ function adminBusinessDetail(id) {
       ${b.status === 'active' ? `<button class="btn btn-danger btn-block" data-action="admin-suspend-biz" data-id="${b.id}">Suspend business</button>` : ''}
       ${b.status === 'suspended' ? `<button class="btn btn-primary btn-block" data-action="admin-reactivate-biz" data-id="${b.id}">Reactivate business</button>` : ''}
     </div>
+
+    <div class="card mt-16">
+      <strong style="font-size:13px;">Registration &amp; payouts</strong>
+      <div class="summary-row mt-8"><span>CAC number</span><span class="val">${escapeHtml(b.cacNumber || 'Not provided')}</span></div>
+      <div class="summary-row"><span>CAC status</span><span class="val">${b.cacVerified ? '<span class="status-badge status-success">Verified</span>' : '<span class="status-badge status-warn">Not verified</span>'}</span></div>
+      <div class="summary-row"><span>Bank</span><span class="val">${escapeHtml(b.bankName || 'Not provided')}</span></div>
+      <div class="summary-row"><span>Account number</span><span class="val">${escapeHtml(b.bankAccountNumber || 'Not provided')}</span></div>
+      <div class="summary-row"><span>Account name</span><span class="val">${escapeHtml(b.bankAccountName || 'Not provided')}</span></div>
+      <div class="summary-row"><span>Subaccount</span><span class="val">${b.subaccountCode ? escapeHtml(b.subaccountCode) : '<span class="text-faint">Not created</span>'}</span></div>
+      ${!b.subaccountCode && b.bankAccountNumber
+        ? `<button class="btn btn-primary btn-block mt-12" data-action="create-subaccount" data-id="${b.id}">Create Paystack subaccount</button>
+           <p class="text-sm text-faint mt-8" style="text-align:center;">Creates the subaccount on Paystack so future payments split automatically.</p>`
+        : ''}
+    </div>
   `;
 }
 
@@ -2670,9 +2687,118 @@ function adminAgentDetail(id) {
       ${metricCard('Pending earnings', formatNaira(a.earningsPending || 0), '')}
       ${metricCard('Paid earnings', formatNaira(a.earningsPaid || 0), '')}
     </div>
+    <div class="card mt-16">
+      <strong style="font-size:13px;">Payout</strong>
+      <div class="summary-row mt-8"><span>Pending payout</span><span class="val">${formatNaira(a.earningsPending || 0)}</span></div>
+      <div class="summary-row"><span>Paid to date</span><span class="val">${formatNaira(a.earningsPaid || 0)}</span></div>
+      ${a.earningsPending > 0
+        ? `<button class="btn btn-primary btn-block mt-12" data-action="agent-open-payout" data-id="${a.id}">Record payout to agent</button>`
+        : `<p class="text-sm text-faint mt-12" style="text-align:center;margin-bottom:0;">Nothing pending.</p>`}
+    </div>
+
+    <div class="section-title-row"><h2>Payout history</h2></div>
+    <div class="row-cards" id="agent-payout-list">
+      <div class="text-sm text-muted">Loading…</div>
+    </div>
+
     <div class="section-title-row"><h2>Recent deliveries</h2></div>
     ${orders.length ? `<div class="row-cards">${orders.slice(0, 8).map((o) => `<div class="row-card flex items-center justify-between"><span style="font-weight:700;font-size:13.5px;">${o.orderNumber}</span>${orderStatusBadge(o.status)}</div>`).join('')}</div>` : `<p class="text-muted text-sm">No deliveries yet.</p>`}
   `;
+}
+
+async function loadAgentPayouts(agentId) {
+  const wrap = document.getElementById('agent-payout-list');
+  if (!wrap || !window.PXDynastySBC || !window.PXDynastySBC.fetchPayouts) return;
+  const list = await window.PXDynastySBC.fetchPayouts(agentId);
+  if (!list.length) {
+    wrap.innerHTML = '<div class="text-sm text-muted">No payouts recorded yet.</div>';
+    return;
+  }
+  wrap.innerHTML = list.map((p) => `
+    <div class="row-card">
+      <div class="row-card-top">
+        <span class="row-card-title">${formatNaira(p.amount)}</span>
+        <span class="status-badge status-success">Paid</span>
+      </div>
+      <div class="row-card-sub">${formatDate(p.paidAt)} · ${escapeHtml(p.method || 'bank transfer')}</div>
+      ${p.reference ? `<div class="row-card-sub">Ref: ${escapeHtml(p.reference)}</div>` : ''}
+      ${p.note ? `<div class="row-card-sub">${escapeHtml(p.note)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function openAgentPayoutModal(agentId) {
+  const a = getAgent(agentId);
+  if (!a) { toast('Agent not found', 'error'); return; }
+  const pending = a.earningsPending || 0;
+  openModal(`
+    <div class="modal-head">
+      <h3>Record payout</h3>
+      <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
+    </div>
+    <p class="text-sm text-muted">Record a bank transfer you have sent to <strong>${escapeHtml(a.name)}</strong>.</p>
+    <div class="card mt-12" style="background:var(--color-primary-tint);border-color:var(--color-primary);">
+      <div class="flex items-center justify-between">
+        <span class="text-sm" style="color:var(--color-primary-dark);font-weight:700;">Pending</span>
+        <strong style="font-size:20px;color:var(--color-primary-dark);">${formatNaira(pending)}</strong>
+      </div>
+    </div>
+    <div class="form-group mt-12"><label>Amount paid (₦)</label><input type="number" id="po-amount" value="${pending}" /></div>
+    <div class="form-group"><label>Method</label>
+      <select id="po-method">
+        <option value="bank_transfer">Bank transfer</option>
+        <option value="cash">Cash</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Reference (optional)</label><input type="text" id="po-reference" placeholder="Transaction ID or note" /></div>
+    <div class="form-group"><label>Note (optional)</label><textarea id="po-note" placeholder="Anything to remember" style="min-height:70px;"></textarea></div>
+    <div class="auth-error" id="po-error"></div>
+    <button class="btn btn-primary btn-block mt-8" data-action="agent-confirm-payout" data-id="${a.id}">Record payout</button>
+  `);
+}
+
+async function recordAgentPayout(agentId) {
+  const a = getAgent(agentId);
+  if (!a) return;
+  const errEl = document.getElementById('po-error');
+  const amount = parseFloat((document.getElementById('po-amount') || {}).value) || 0;
+  const method = (document.getElementById('po-method') || {}).value || 'bank_transfer';
+  const reference = (document.getElementById('po-reference') || {}).value || '';
+  const note = (document.getElementById('po-note') || {}).value || '';
+  if (amount <= 0) { if (errEl) errEl.textContent = 'Enter a valid amount.'; return; }
+  if (amount > a.earningsPending) { if (errEl) errEl.textContent = 'Amount is more than the pending balance.'; return; }
+
+  const me = currentSenderInfo();
+  const payout = {
+    id: 'po-' + Math.random().toString(36).slice(2, 10),
+    agentId: a.id,
+    amount,
+    method,
+    reference: reference || null,
+    note: note || null,
+    paidBy: me.name || 'Admin',
+    paidAt: new Date().toISOString(),
+  };
+
+  if (window.PXDynastySBC && window.PXDynastySBC.insertPayout) {
+    const r = await window.PXDynastySBC.insertPayout(payout);
+    if (!r.ok) { if (errEl) errEl.textContent = 'Save failed: ' + (r.error || ''); return; }
+  }
+
+  a.earningsPending = Math.max(0, (a.earningsPending || 0) - amount);
+  a.earningsPaid = (a.earningsPaid || 0) + amount;
+  saveDataLocalOnly();
+  if (window.PXDynastySBC && window.PXDynastySBC.upsertAgent) {
+    window.PXDynastySBC.upsertAgent(a).catch(() => {});
+  }
+
+  pushNotification('agent', a.id, 'Payout recorded', `${formatNaira(amount)} has been sent to you.`, 'wallet');
+
+  closeModal();
+  toast('Payout recorded', 'success');
+  loadAgentPayouts(agentId);
+  render();
 }
 
 function adminPayments() {
@@ -2801,6 +2927,21 @@ function adminBusinessNew() {
         <div class="form-group"><label>Address</label><input type="text" id="cb-address" placeholder="e.g. Sabon Gari, Kano" /></div>
       </div>
     </div>
+
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Registration &amp; payouts</strong>
+      <p class="text-sm text-muted mt-8">Required for settlement. Bank account must match the business name.</p>
+      <div class="form-group"><label>CAC registration number</label><input type="text" id="cb-cac" placeholder="e.g. RC-1234567 or BN-1234567" /></div>
+      <div class="form-row">
+        <div class="form-group"><label>Bank name</label><input type="text" id="cb-bankName" placeholder="e.g. Moniepoint, GTBank" /></div>
+        <div class="form-group"><label>Bank code</label><input type="text" id="cb-bankCode" placeholder="e.g. 50515" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Account number</label><input type="text" id="cb-bankAccount" placeholder="10 digits" /></div>
+        <div class="form-group"><label>Account name</label><input type="text" id="cb-bankAccountName" placeholder="Must match business name" /></div>
+      </div>
+    </div>
+
     <div class="card mt-12">
       <strong style="font-size:13px;">Login credentials</strong>
       <p class="text-sm text-muted mt-8">Share these with the business owner. They log in at this same page.</p>
@@ -2857,6 +2998,29 @@ function adminBusinessEdit(id) {
         </div>
       </div>
       <div class="auth-error" id="eb-error" style="margin:6px 0 0;"></div>
+    </div>
+
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Registration &amp; payouts</strong>
+      <p class="text-sm text-muted mt-8">Bank account must match the business name on CAC.</p>
+      <div class="form-row">
+        <div class="form-group"><label>CAC number</label><input type="text" id="eb-cac" value="${escapeHtml(b.cacNumber || '')}" placeholder="RC-… or BN-…" /></div>
+        <div class="form-group"><label>CAC verified</label>
+          <select id="eb-cacVerified">
+            <option value="false" ${!b.cacVerified ? 'selected' : ''}>No</option>
+            <option value="true" ${b.cacVerified ? 'selected' : ''}>Yes</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Bank name</label><input type="text" id="eb-bankName" value="${escapeHtml(b.bankName || '')}" /></div>
+        <div class="form-group"><label>Bank code</label><input type="text" id="eb-bankCode" value="${escapeHtml(b.bankCode || '')}" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Account number</label><input type="text" id="eb-bankAccount" value="${escapeHtml(b.bankAccountNumber || '')}" /></div>
+        <div class="form-group"><label>Account name</label><input type="text" id="eb-bankAccountName" value="${escapeHtml(b.bankAccountName || '')}" /></div>
+      </div>
+      ${b.subaccountCode ? `<div class="form-group mb-0"><label>Paystack subaccount code</label><input type="text" value="${escapeHtml(b.subaccountCode)}" disabled /></div>` : ''}
     </div>
 
     <div class="card mt-12">
@@ -3965,6 +4129,11 @@ function handleAction(el, ev) {
         address:      (document.getElementById('cb-address') || {}).value || '',
         email:        (document.getElementById('cb-email') || {}).value || '',
         password:     (document.getElementById('cb-password') || {}).value || '',
+        cacNumber:        (document.getElementById('cb-cac') || {}).value || '',
+        bankName:         (document.getElementById('cb-bankName') || {}).value || '',
+        bankCode:         (document.getElementById('cb-bankCode') || {}).value || '',
+        bankAccountNumber:(document.getElementById('cb-bankAccount') || {}).value || '',
+        bankAccountName:  (document.getElementById('cb-bankAccountName') || {}).value || '',
       }).then((res) => {
         const errEl = document.getElementById('cb-error');
         if (!res.ok) {
@@ -4102,6 +4271,14 @@ function handleAction(el, ev) {
       b.status = (document.getElementById('eb-status') || {}).value || b.status;
       const vEl = document.getElementById('eb-verified');
       b.verified = vEl ? vEl.value === 'true' : b.verified;
+      b.cacNumber = (document.getElementById('eb-cac') || {}).value || b.cacNumber || null;
+      const cvEl = document.getElementById('eb-cacVerified');
+      b.cacVerified = cvEl ? cvEl.value === 'true' : !!b.cacVerified;
+      if (b.cacVerified && !b.cacVerifiedAt) b.cacVerifiedAt = new Date().toISOString();
+      b.bankName = (document.getElementById('eb-bankName') || {}).value || null;
+      b.bankCode = (document.getElementById('eb-bankCode') || {}).value || null;
+      b.bankAccountNumber = (document.getElementById('eb-bankAccount') || {}).value || null;
+      b.bankAccountName = (document.getElementById('eb-bankAccountName') || {}).value || null;
       saveData(DB);
       if (window.PXDynastySBC && window.PXDynastySBC.upsertBusiness) {
         window.PXDynastySBC.upsertBusiness(b).then((r) => {
@@ -4140,6 +4317,23 @@ function handleAction(el, ev) {
     case 'open-order-summary': openOrderSummary(el.dataset.orderId); break;
     case 'open-order-chat': openOrderChat(el.dataset.orderId); break;
     case 'chat-set-channel': setChatChannel(el.dataset.channel); break;
+    case 'create-subaccount': {
+      const id = el.dataset.id;
+      const b = getBusiness(id);
+      if (!b) break;
+      if (!b.bankAccountNumber || !b.bankCode) {
+        toast('Add bank account + bank code first', 'error');
+        break;
+      }
+      if (!b.cacVerified) {
+        toast('Verify CAC before creating subaccount', 'error');
+        break;
+      }
+      toast('Subaccount creation pending Paystack production approval. Details saved.', 'info');
+      break;
+    }
+    case 'agent-open-payout': openAgentPayoutModal(el.dataset.id); break;
+    case 'agent-confirm-payout': recordAgentPayout(el.dataset.id); break;
     case 'support-submit': submitSupportTicket(el.dataset.orderId || null); break;
     case 'admin-support-filter': navigate('admin-support', { status: el.dataset.status }); break;
     case 'support-reply-open': openSupportReplyModal(el.dataset.id); break;

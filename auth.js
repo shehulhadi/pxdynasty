@@ -266,6 +266,14 @@ async function authCreateBusinessAccount(opts) {
     deliveryEstimate: 30,
     hue: Math.floor(Math.random() * 360),
     open: true,
+    // CAC + bank (used for subaccount creation later)
+    cacNumber: opts.cacNumber || null,
+    cacVerified: false,
+    bankName: opts.bankName || null,
+    bankCode: opts.bankCode || null,
+    bankAccountNumber: opts.bankAccountNumber || null,
+    bankAccountName: opts.bankAccountName || null,
+    subaccountCode: null,
     createdAt: new Date().toISOString(),
   };
 

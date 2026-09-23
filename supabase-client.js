@@ -38,6 +38,14 @@ function sbcRowToBiz(r) {
     deliveryEstimate: r.delivery_estimate,
     hue: r.hue,
     open: r.open,
+    cacNumber: r.cac_number || null,
+    cacVerified: !!r.cac_verified,
+    cacVerifiedAt: r.cac_verified_at || null,
+    bankCode: r.bank_code || null,
+    bankName: r.bank_name || null,
+    bankAccountNumber: r.bank_account_number || null,
+    bankAccountName: r.bank_account_name || null,
+    subaccountCode: r.subaccount_code || null,
     createdAt: r.created_at,
   };
 }
@@ -135,6 +143,14 @@ function sbcBizToRow(b) {
     address: b.address, rating: b.rating, verified: b.verified,
     status: b.status, delivery_estimate: b.deliveryEstimate,
     hue: b.hue, open: b.open,
+    cac_number: b.cacNumber || null,
+    cac_verified: !!b.cacVerified,
+    cac_verified_at: b.cacVerifiedAt || null,
+    bank_code: b.bankCode || null,
+    bank_name: b.bankName || null,
+    bank_account_number: b.bankAccountNumber || null,
+    bank_account_name: b.bankAccountName || null,
+    subaccount_code: b.subaccountCode || null,
   };
 }
 function sbcProductToRow(p) {
@@ -443,6 +459,54 @@ async function sbcFetchCounts() {
   }
 }
 
+/* ---- Agent payouts ---- */
+
+function sbcRowToPayout(r) {
+  return {
+    id: r.id,
+    agentId: r.agent_id,
+    amount: Number(r.amount || 0),
+    method: r.method || 'bank_transfer',
+    reference: r.reference || null,
+    note: r.note || null,
+    paidBy: r.paid_by || null,
+    paidAt: r.paid_at,
+    orderIds: r.order_ids || [],
+  };
+}
+function sbcPayoutToRow(p) {
+  return {
+    id: p.id,
+    agent_id: p.agentId,
+    amount: p.amount,
+    method: p.method || 'bank_transfer',
+    reference: p.reference || null,
+    note: p.note || null,
+    paid_by: p.paidBy || null,
+    order_ids: p.orderIds || [],
+  };
+}
+
+async function sbcFetchPayouts(agentId) {
+  const c = sbcInit();
+  if (!c || !agentId) return [];
+  const { data, error } = await c.from('agent_payouts')
+    .select('*')
+    .eq('agent_id', agentId)
+    .order('paid_at', { ascending: false })
+    .limit(100);
+  if (error) { console.error('fetchPayouts', error); return []; }
+  return (data || []).map(sbcRowToPayout);
+}
+
+async function sbcInsertPayout(p) {
+  const c = sbcInit();
+  if (!c) return { ok: false, error: 'no client' };
+  const { error } = await c.from('agent_payouts').insert(sbcPayoutToRow(p));
+  if (error) { console.error('insertPayout', error); return { ok: false, error: error.message }; }
+  return { ok: true };
+}
+
 /* Expose globally for app.js to call. */
 window.PXDynastySBC = {
   init: sbcInit,
@@ -463,4 +527,6 @@ window.PXDynastySBC = {
   insertTicket: sbcInsertTicket,
   updateTicket: sbcUpdateTicket,
   fetchCounts: sbcFetchCounts,
+  fetchPayouts: sbcFetchPayouts,
+  insertPayout: sbcInsertPayout,
 };
