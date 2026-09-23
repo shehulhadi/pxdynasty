@@ -307,6 +307,7 @@ function sbcRowToMessage(r) {
   return {
     id: r.id,
     orderId: r.order_id,
+    channel: r.channel || 'all',
     senderId: r.sender_id,
     senderRole: r.sender_role,
     senderName: r.sender_name,
@@ -318,6 +319,7 @@ function sbcMessageToRow(m) {
   return {
     id: m.id,
     order_id: m.orderId,
+    channel: m.channel || 'all',
     sender_id: m.senderId,
     sender_role: m.senderRole,
     sender_name: m.senderName,

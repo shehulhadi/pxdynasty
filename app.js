@@ -2939,12 +2939,14 @@ async function loadStaffList() {
 }
 
 /* ==========================================================================
-   ORDER CHAT — per-order messaging between customer, business, agent, admin
+   ORDER CHAT — channel-based messaging between customer, business, agent, admin
    ========================================================================== */
 
 let _chatOrderId = null;
 let _chatPollTimer = null;
 let _chatLastIds = new Set();
+let _chatAllMessages = [];
+let _chatActiveChannel = 'all';
 
 function currentSenderInfo() {
   const u = window.PXDynastyAuth && window.PXDynastyAuth.currentUserSync && window.PXDynastyAuth.currentUserSync();
@@ -2965,23 +2967,70 @@ function currentSenderInfo() {
     }
     return { id: u.id || ('u-' + role), role, name };
   }
-  // Fallback — no auth module.
   return { id: 'anon-' + state.role, role: state.role, name: state.role };
+}
+
+function chatChannelsForRole(role) {
+  // Codes: 'all', 'cust-biz', 'cust-agent', 'biz-agent'
+  if (role === 'customer') {
+    return [
+      { id: 'all', label: 'All' },
+      { id: 'cust-biz', label: 'Business' },
+      { id: 'cust-agent', label: 'Agent' },
+    ];
+  }
+  if (role === 'business' || role === 'staff') {
+    return [
+      { id: 'all', label: 'All' },
+      { id: 'cust-biz', label: 'Customer' },
+      { id: 'biz-agent', label: 'Agent' },
+    ];
+  }
+  if (role === 'agent') {
+    return [
+      { id: 'all', label: 'All' },
+      { id: 'cust-agent', label: 'Customer' },
+      { id: 'biz-agent', label: 'Business' },
+    ];
+  }
+  if (role === 'admin') {
+    return [
+      { id: 'all', label: 'All' },
+      { id: 'cust-biz', label: 'Cust↔Biz' },
+      { id: 'cust-agent', label: 'Cust↔Agent' },
+      { id: 'biz-agent', label: 'Biz↔Agent' },
+    ];
+  }
+  return [{ id: 'all', label: 'All' }];
 }
 
 function stopChatPolling() {
   if (_chatPollTimer) { clearInterval(_chatPollTimer); _chatPollTimer = null; }
 }
 
-function renderChatMessages(messages) {
+function renderChatTabs() {
+  const wrap = document.getElementById('chat-tabs');
+  if (!wrap) return;
+  const me = currentSenderInfo();
+  const channels = chatChannelsForRole(me.role);
+  wrap.innerHTML = channels.map((c) => `
+    <button class="chat-tab ${_chatActiveChannel === c.id ? 'active' : ''}" data-action="chat-set-channel" data-channel="${c.id}">${escapeHtml(c.label)}</button>
+  `).join('');
+}
+
+function renderChatMessages() {
   const wrap = document.getElementById('chat-messages');
   if (!wrap) return;
   const me = currentSenderInfo();
-  if (!messages.length) {
-    wrap.innerHTML = '<div class="text-sm text-muted" style="text-align:center;padding:20px 6px;">No messages yet. Say something to get started.</div>';
+  const visible = _chatAllMessages.filter((m) => m.channel === _chatActiveChannel);
+
+  if (!visible.length) {
+    const label = (chatChannelsForRole(me.role).find((c) => c.id === _chatActiveChannel) || {}).label || 'this channel';
+    wrap.innerHTML = `<div class="text-sm text-muted" style="text-align:center;padding:24px 6px;">No messages in ${escapeHtml(label)} yet.</div>`;
     return;
   }
-  wrap.innerHTML = messages.map((m) => {
+
+  wrap.innerHTML = visible.map((m) => {
     const mine = m.senderId === me.id || (m.senderRole === me.role && m.senderName === me.name);
     return `<div style="display:flex;flex-direction:column;align-items:${mine ? 'flex-end' : 'flex-start'};margin-bottom:10px;">
       <div style="font-size:11px;color:var(--color-text-faint);margin-bottom:3px;">${escapeHtml(m.senderName || m.senderRole || 'User')} · ${timeAgo(m.createdAt)}</div>
@@ -2996,7 +3045,6 @@ function renderChatMessages(messages) {
 async function loadChatMessages(orderId) {
   if (!window.PXDynastySBC || !window.PXDynastySBC.fetchMessages) return;
   const messages = await window.PXDynastySBC.fetchMessages(orderId);
-  // Only re-render if the set changed, so we don't steal scroll position.
   const ids = new Set(messages.map((m) => m.id));
   if (ids.size === _chatLastIds.size) {
     let same = true;
@@ -3004,7 +3052,8 @@ async function loadChatMessages(orderId) {
     if (same) return;
   }
   _chatLastIds = ids;
-  renderChatMessages(messages);
+  _chatAllMessages = messages;
+  renderChatMessages();
 }
 
 function openOrderChat(orderId) {
@@ -3013,6 +3062,10 @@ function openOrderChat(orderId) {
   stopChatPolling();
   _chatOrderId = orderId;
   _chatLastIds = new Set();
+  _chatAllMessages = [];
+  _chatActiveChannel = 'all';
+
+  const me = currentSenderInfo();
 
   openModal(`
     <div class="modal-head">
@@ -3022,17 +3075,20 @@ function openOrderChat(orderId) {
       </div>
       <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
     </div>
-    <div id="chat-messages" style="max-height:340px;overflow-y:auto;padding:10px 4px 6px;border-radius:var(--radius-sm);background:var(--color-bg);"></div>
+    <div id="chat-tabs" style="display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--color-border);padding-bottom:2px;margin-bottom:8px;"></div>
+    <div id="chat-messages" style="max-height:320px;overflow-y:auto;padding:10px 4px 6px;border-radius:var(--radius-sm);background:var(--color-bg);"></div>
     <div style="display:flex;gap:8px;margin-top:12px;">
       <input type="text" id="chat-input" placeholder="Type a message…" style="flex:1;" autocomplete="off" />
-      <button class="btn btn-primary" data-action="chat-send" data-order-id="${order.id}">${ICONS.send || ''} Send</button>
+      <button class="btn btn-primary" data-action="chat-send" data-order-id="${order.id}">Send</button>
     </div>
+    <p class="text-sm text-faint" style="margin-top:8px;text-align:center;">Messages on this tab are visible only to the parties shown.</p>
   `);
 
+  renderChatTabs();
+  renderChatMessages();
   loadChatMessages(orderId);
   _chatPollTimer = setInterval(() => loadChatMessages(orderId), 4000);
 
-  // Enter to send.
   const input = document.getElementById('chat-input');
   if (input) {
     input.focus();
@@ -3055,6 +3111,7 @@ async function sendChatMessage(orderId) {
   const msg = {
     id: 'msg-' + Math.random().toString(36).slice(2, 10),
     orderId,
+    channel: _chatActiveChannel,
     senderId: me.id,
     senderRole: me.role,
     senderName: me.name,
@@ -3062,21 +3119,22 @@ async function sendChatMessage(orderId) {
     createdAt: new Date().toISOString(),
   };
   input.value = '';
-  // Optimistic render
-  const wrap = document.getElementById('chat-messages');
-  if (wrap) {
-    wrap.insertAdjacentHTML('beforeend', `<div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:10px;">
-      <div style="font-size:11px;color:var(--color-text-faint);margin-bottom:3px;">${escapeHtml(me.name)} · just now</div>
-      <div style="max-width:80%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.4;background:var(--color-primary);color:#fff;border-bottom-right-radius:3px;">${escapeHtml(body)}</div>
-    </div>`);
-    wrap.scrollTop = wrap.scrollHeight;
-  }
+  _chatAllMessages.push(msg);
+  renderChatMessages();
   if (window.PXDynastySBC && window.PXDynastySBC.insertMessage) {
     const r = await window.PXDynastySBC.insertMessage(msg);
     if (!r.ok) toast('Message failed to send: ' + (r.error || ''), 'error');
   } else {
     toast('Message service unavailable', 'error');
   }
+}
+
+function setChatChannel(channel) {
+  _chatActiveChannel = channel;
+  renderChatTabs();
+  renderChatMessages();
+  const input = document.getElementById('chat-input');
+  if (input) input.focus();
 }
 
 function orderChatButton(orderId, label) {
@@ -3518,6 +3576,7 @@ function handleAction(el, ev) {
       break;
     }
     case 'open-order-chat': openOrderChat(el.dataset.orderId); break;
+    case 'chat-set-channel': setChatChannel(el.dataset.channel); break;
     case 'address-open': openAddressModal(el.dataset.id || null); break;
     case 'address-save': {
       const id = el.dataset.id || '';
