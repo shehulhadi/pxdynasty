@@ -1988,71 +1988,143 @@ function agentActiveDelivery(agent) {
   const biz = getBusiness(active.businessId) || { name: 'Business', address: '', phone: '' };
   const cust = getCustomer(active.customerId) || { name: 'Customer', phone: '' };
   const stage = active.status;
+
   const elapsed = (() => {
     const mins = Math.max(0, Math.floor((Date.now() - new Date(active.createdAt).getTime()) / 60000));
     if (mins < 60) return mins + ' min';
     const h = Math.floor(mins / 60); const m = mins % 60;
     return h + 'h ' + m + 'm';
   })();
+
+  // Distance estimate based on order id (deterministic). Real GPS comes later.
+  const kmNum = parseFloat(distanceForOrder(active)) || 3;
+  const etaMin = Math.round(kmNum * 6 + 10);
+
+  // Progress strip: 3 stages.
+  const stages = ['Pickup', 'On the way', 'Handoff'];
+  const stageIdx = stage === 'agent_assigned' ? 0 : stage === 'picked_up' ? 1 : 2;
+
+  // Waiting timer for out_for_delivery.
+  let waitingMins = 0;
+  if (stage === 'out_for_delivery') {
+    const lastEvent = (active.statusHistory || []).filter((h) => h.status === 'out_for_delivery').pop();
+    if (lastEvent) waitingMins = Math.max(0, Math.floor((Date.now() - new Date(lastEvent.time).getTime()) / 60000));
+  }
+
+  // Pickup checklist — persisted on the order as JSON.
+  const checklist = active.pickupChecklist || {};
+
   const stageLabel = stage === 'agent_assigned' ? 'Pickup pending'
     : stage === 'picked_up' ? 'On the way to customer'
     : 'Out for delivery';
+
   return `
     <div class="page-head">
       <div><h1>Active delivery</h1><div class="sub">${escapeHtml(stageLabel)} · ${elapsed} elapsed</div></div>
       <span class="status-badge status-accent">${formatNaira(active.financial.agentPayment)}</span>
     </div>
 
-    <div class="card">
-      <div class="flex items-center justify-between"><strong>${active.orderNumber}</strong>${orderStatusBadge(active.status)}</div>
-      <hr class="divider" />
-      <div class="flex items-start gap-10"><div style="color:var(--color-primary);">${ICONS.store}</div>
-        <div style="flex:1;">
-          <div class="text-sm text-faint" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Pickup from</div>
-          <strong style="font-size:14px;">${escapeHtml(biz.name)}</strong>
-          <div class="text-sm text-muted">${escapeHtml(biz.address || 'No address on file')}</div>
-          ${biz.phone ? `<div class="text-sm text-muted">${escapeHtml(biz.phone)}</div>` : ''}
-        </div>
+    <!-- Progress strip -->
+    <div class="card" style="padding:14px 16px;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        ${stages.map((label, i) => {
+          const done = i < stageIdx;
+          const current = i === stageIdx;
+          const color = done || current ? 'var(--color-primary)' : 'var(--color-border)';
+          const textColor = done || current ? 'var(--color-primary-dark)' : 'var(--color-text-faint)';
+          return `
+            <div style="flex:1;text-align:center;">
+              <div style="height:4px;border-radius:2px;background:${color};margin-bottom:6px;"></div>
+              <div style="font-size:11px;font-weight:700;color:${textColor};">${label}</div>
+            </div>`;
+        }).join('')}
       </div>
-      <div class="flex items-start gap-10 mt-12"><div style="color:var(--color-accent-dark);">${ICONS.location}</div>
-        <div style="flex:1;">
-          <div class="text-sm text-faint" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Deliver to</div>
-          <strong style="font-size:14px;">${escapeHtml(cust.name)}</strong>
-          ${cust.phone ? `<div class="text-sm text-muted">${escapeHtml(cust.phone)}</div>` : ''}
-          <div class="text-sm text-muted">${escapeHtml(active.deliveryAddress)}</div>
-        </div>
-      </div>
-      ${active.deliveryInstructions ? `<p class="text-sm text-faint mt-12" style="margin-bottom:0;padding:8px 10px;background:var(--color-surface-alt);border-radius:8px;">Note from customer: ${escapeHtml(active.deliveryInstructions)}</p>` : ''}
+    </div>
+
+    <!-- Distance / ETA -->
+    <div class="flex gap-8 mt-12">
+      <span class="chip">${ICONS.location} ~${kmNum} km</span>
+      <span class="chip">${ICONS.clock} ETA ~${etaMin} min</span>
     </div>
 
     <div class="card mt-12">
-      <div class="flex items-center justify-between"><strong style="font-size:13px;">Items to pick up</strong><span class="text-sm text-muted">${active.items.length} item${active.items.length === 1 ? '' : 's'}</span></div>
-      <div class="mt-8">${active.items.map((it) => `<div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span></div>`).join('')}</div>
+      <div class="flex items-center justify-between"><strong>${active.orderNumber}</strong>${orderStatusBadge(active.status)}</div>
+      <hr class="divider" />
+
+      <!-- Pickup -->
+      <div class="flex items-start gap-10">
+        <div style="color:var(--color-primary);">${ICONS.store}</div>
+        <div style="flex:1;">
+          <div class="text-sm text-faint" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700;">1st stop · Pickup</div>
+          <strong style="font-size:14px;">${escapeHtml(biz.name)}</strong>
+          <div class="text-sm text-muted">${escapeHtml(biz.address || 'No address on file')}</div>
+          ${biz.phone ? `
+            <div class="flex items-center gap-8 mt-8">
+              <a class="btn btn-outline btn-sm" href="tel:${escapeHtml(biz.phone)}">${ICONS.phone} Call</a>
+              <button class="btn btn-outline btn-sm" data-action="open-order-chat" data-order-id="${active.id}">${ICONS.bell2} Message</button>
+            </div>` : ''}
+        </div>
+      </div>
+
+      <!-- Drop-off -->
+      <div class="flex items-start gap-10 mt-16">
+        <div style="color:var(--color-accent-dark);">${ICONS.location}</div>
+        <div style="flex:1;">
+          <div class="text-sm text-faint" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700;">2nd stop · Drop-off</div>
+          <strong style="font-size:14px;">${escapeHtml(cust.name)}</strong>
+          ${cust.phone ? `<div class="text-sm text-muted">${escapeHtml(cust.phone)}</div>` : ''}
+          <div class="text-sm text-muted">${escapeHtml(active.deliveryAddress)}</div>
+          ${cust.phone ? `
+            <div class="flex items-center gap-8 mt-8">
+              <a class="btn btn-outline btn-sm" href="tel:${escapeHtml(cust.phone)}">${ICONS.phone} Call</a>
+              <button class="btn btn-outline btn-sm" data-action="open-order-chat" data-order-id="${active.id}">${ICONS.bell2} Message</button>
+            </div>` : ''}
+        </div>
+      </div>
+
+      ${active.deliveryInstructions ? `<p class="text-sm text-faint mt-12" style="margin-bottom:0;padding:8px 10px;background:var(--color-surface-alt);border-radius:8px;">Note from customer: ${escapeHtml(active.deliveryInstructions)}</p>` : ''}
     </div>
 
+    <!-- Pickup checklist -->
+    <div class="card mt-12">
+      <div class="flex items-center justify-between">
+        <strong style="font-size:13px;">Pickup checklist</strong>
+        <span class="text-sm text-muted">${Object.values(checklist).filter(Boolean).length}/${active.items.length} packed</span>
+      </div>
+      <div class="mt-8">
+        ${active.items.map((it, i) => {
+          const done = !!checklist[String(i)];
+          return `
+            <div class="flex items-center gap-10 pressable" style="padding:10px 4px;border-bottom:1px solid var(--color-border-soft);cursor:pointer;" data-action="agent-toggle-checklist" data-order-id="${active.id}" data-index="${i}">
+              <div style="width:22px;height:22px;border-radius:6px;border:2px solid ${done ? 'var(--color-primary)' : 'var(--color-border)'};background:${done ? 'var(--color-primary)' : 'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                ${done ? `<span style="color:#fff;font-size:13px;">✓</span>` : ''}
+              </div>
+              <div style="flex:1;font-size:13.5px;${done ? 'text-decoration:line-through;color:var(--color-text-faint);' : ''}">${it.qty} × ${escapeHtml(it.name)}</div>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Earnings -->
     <div class="card mt-12" style="background:var(--color-primary-tint);border-color:var(--color-primary);">
       <div class="flex items-center justify-between">
         <span class="text-sm" style="color:var(--color-primary-dark);font-weight:700;">You will earn</span>
         <strong style="font-size:20px;color:var(--color-primary-dark);">${formatNaira(active.financial.agentPayment)}</strong>
       </div>
-      <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-primary-dark);">Paid out to your account after the customer confirms delivery.</p>
+      <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-primary-dark);">Paid out after the customer confirms delivery.</p>
     </div>
 
-    <div class="flex gap-10 mt-12">
-      ${biz.phone ? `<a class="btn btn-outline btn-block" href="tel:${escapeHtml(biz.phone)}">${ICONS.phone} Call business</a>` : ''}
-      ${cust.phone ? `<a class="btn btn-outline btn-block" href="tel:${escapeHtml(cust.phone)}">${ICONS.phone} Call customer</a>` : ''}
-    </div>
-
-    <div class="map-placeholder mt-12">${ICONS.navArrow}<span style="margin-left:6px;">Navigation preview</span></div>
-
+    <!-- Waiting-for-customer card with timer + fallback -->
     ${stage === 'out_for_delivery' ? `
       <div class="card mt-12" style="background:var(--color-accent-tint);border-color:var(--color-accent);">
-        <strong style="font-size:13px;color:var(--color-accent-dark);">Waiting for customer confirmation</strong>
-        <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-accent-dark);">The customer confirms receipt from their own app once you hand over the order. You'll see the order complete automatically.</p>
+        <div class="flex items-center justify-between">
+          <strong style="font-size:13px;color:var(--color-accent-dark);">Waiting for customer confirmation</strong>
+          <span class="text-sm" style="color:var(--color-accent-dark);font-weight:700;">${waitingMins} min</span>
+        </div>
+        <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-accent-dark);">The customer confirms receipt in their app once you hand over the order. If they can't, use the button below to report the issue.</p>
+        <button class="btn btn-outline btn-block mt-12" data-action="agent-customer-unreachable" data-order-id="${active.id}">Customer not answering</button>
       </div>
     ` : ''}
-
-    <div class="mt-12">${orderChatButton(active.id, 'Message customer / business')}</div>
 
     <div class="sticky-bottom-bar">
       ${stage === 'agent_assigned' ? `<button class="btn btn-primary btn-block" data-action="agent-confirm-pickup" data-order-id="${active.id}">Confirm pickup from business</button>` : ''}
@@ -3135,6 +3207,44 @@ function handleAction(el, ev) {
     case 'agent-confirm-pickup': updateOrderStatus(el.dataset.orderId, 'picked_up'); render(); toast('Pickup confirmed', 'success'); break;
     case 'agent-start-transit': updateOrderStatus(el.dataset.orderId, 'out_for_delivery'); render(); toast('On the way to customer', 'success'); break;
     case 'agent-open-otp': openOtpModal(el.dataset.orderId); break;
+    case 'agent-toggle-checklist': {
+      const id = el.dataset.orderId;
+      const idx = String(el.dataset.index);
+      const order = getOrder(id);
+      if (!order) break;
+      order.pickupChecklist = order.pickupChecklist || {};
+      order.pickupChecklist[idx] = !order.pickupChecklist[idx];
+      saveDataLocalOnly();
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertOrder) {
+        window.PXDynastySBC.upsertOrder(order).catch(() => {});
+      }
+      render();
+      break;
+    }
+    case 'agent-customer-unreachable': {
+      const id = el.dataset.orderId;
+      const order = getOrder(id);
+      if (!order) break;
+      confirmDialog(
+        'Report customer not answering?',
+        'The business and support team will be notified. The order stays open — you can keep trying or continue once they respond.',
+        'Yes, report it',
+        () => {
+          pushNotification('customer', order.customerId, 'Delivery agent could not reach you', `Order ${order.orderNumber}: your agent is at the delivery point and cannot reach you. Please call them back.`, 'phone');
+          pushNotification('business', order.businessId, 'Agent waiting for customer', `Order ${order.orderNumber}: the agent cannot reach the customer.`, 'flag');
+          pushNotification('admin', null, 'Agent reported unreachable customer', `Order ${order.orderNumber} — agent waiting.`, 'gavel');
+          order.statusHistory = order.statusHistory || [];
+          order.statusHistory.push({ status: 'customer_unreachable', time: new Date().toISOString() });
+          saveDataLocalOnly();
+          if (window.PXDynastySBC && window.PXDynastySBC.upsertOrder) {
+            window.PXDynastySBC.upsertOrder(order).catch(() => {});
+          }
+          toast('Customer + support notified', 'success');
+          render();
+        }
+      );
+      break;
+    }
     case 'agent-force-delivered': {
       const id = el.dataset.orderId;
       confirmDialog(

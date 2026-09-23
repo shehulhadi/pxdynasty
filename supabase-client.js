@@ -90,6 +90,7 @@ function sbcRowToOrder(r) {
     disputeAt: r.dispute_at || null,
     paymentReference: r.payment_reference || null,
     paymentVerifiedAt: r.payment_verified_at || null,
+    pickupChecklist: r.pickup_checklist || {},
     createdAt: r.created_at,
   };
 }
@@ -158,6 +159,7 @@ function sbcOrderToRow(o) {
     dispute_at: o.disputeAt || null,
     payment_reference: o.paymentReference || null,
     payment_verified_at: o.paymentVerifiedAt || null,
+    pickup_checklist: o.pickupChecklist || {},
   };
 }
 function sbcCustomerToRow(c) {
