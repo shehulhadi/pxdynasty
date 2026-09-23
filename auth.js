@@ -451,65 +451,217 @@ async function authCreateAgentAccount(opts) {
 
 function renderLandingPage() {
   return `
-    <div class="auth-shell">
-      <div class="auth-hero">
-        <div class="auth-blobs">
-          <div class="blob blob-1"></div>
-          <div class="blob blob-2"></div>
-          <div class="blob blob-3"></div>
-        </div>
-        <div class="auth-hero-inner">
-          <div class="auth-brand">
-            <span class="brand-mark" style="width:38px;height:38px;font-size:17px;">PX</span>
-            <span>PXDynasty</span>
+    <div class="landing-shell">
+
+      <!-- NAV -->
+      <header class="landing-nav">
+        <div class="landing-nav-inner">
+          <div class="landing-logo">
+            <span class="landing-logo-mark">PX</span>
+            <span class="landing-logo-text">PXDynasty</span>
           </div>
-          <p class="auth-eyebrow">Local marketplace · delivered</p>
-          <h1 class="auth-title">
-            Everything local.<br/>
-            <span class="auth-title-accent">Delivered to your door.</span>
+          <a href="javascript:void(0)" class="landing-signin" data-auth="show-login">Sign in</a>
+        </div>
+      </header>
+
+      <!-- HERO -->
+      <section class="landing-hero">
+        <div class="landing-hero-inner">
+          <p class="landing-eyebrow">Local marketplace · Yola &amp; beyond</p>
+          <h1 class="landing-h1">
+            One checkout.<br/>
+            Every shop in town.
           </h1>
-          <p class="auth-lead">
-            PXDynasty connects neighbourhood businesses and customers with fast,
-            reliable delivery — one checkout, one delivery, one platform.
+          <p class="landing-lede">
+            Order from several local businesses in a single cart. Pay once.
+            Each shop prepares and delivers its own items to your door.
           </p>
-          <div class="auth-cta-row">
-            <button class="btn btn-primary" data-auth="show-signup">Create a customer account</button>
-            <button class="btn btn-outline" data-auth="show-login">Sign in</button>
+          <div class="landing-actions">
+            <button class="btn btn-primary" data-auth="show-signup">Start shopping</button>
+            <a href="javascript:void(0)" class="landing-link" data-auth="show-merchant">Own a business? Talk to us <span aria-hidden="true">→</span></a>
           </div>
-          <div class="auth-meta-row">
-            <div class="auth-meta-item"><strong>Local</strong><span>Support nearby businesses</span></div>
-            <div class="auth-meta-item"><strong>Fast</strong><span>Same-day delivery</span></div>
-            <div class="auth-meta-item"><strong>Simple</strong><span>Pay once, we handle the rest</span></div>
-          </div>
-        </div>
-      </div>
-      <div class="auth-right">
-        <div class="auth-right-inner">
-          <div class="auth-panel" id="auth-panel">
-            ${renderAuthPanel('login')}
+
+          <div class="landing-proof" id="landing-proof">
+            <span class="proof-item"><strong id="proof-biz">—</strong> local merchants</span>
+            <span class="proof-dot">·</span>
+            <span class="proof-item"><strong id="proof-prod">—</strong> products listed</span>
+            <span class="proof-dot">·</span>
+            <span class="proof-item"><strong id="proof-ord">—</strong> orders processed</span>
           </div>
         </div>
-      </div>
+      </section>
+
+      <!-- PRODUCT PREVIEW -->
+      <section class="landing-preview">
+        <div class="landing-preview-inner">
+          <div class="preview-card">
+            <div class="preview-thumb">
+              <div class="preview-thumb-inner">🍗</div>
+            </div>
+            <div class="preview-body">
+              <div class="preview-biz">PX Poultry</div>
+              <div class="preview-name">Live Broiler — whole bird</div>
+              <div class="preview-rating">★ 4.8 · 12 sold</div>
+              <div class="preview-price">₦8,500</div>
+              <div class="preview-cta">Add to cart</div>
+            </div>
+          </div>
+          <div class="preview-text">
+            <h2>Real products. Real shops. Real delivery.</h2>
+            <p>Every listing is from a verified local business. Browse their actual stock, prices, and photos — no middleman guessing.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- HOW IT WORKS -->
+      <section class="landing-how">
+        <div class="landing-how-inner">
+          <p class="landing-eyebrow">How it works</p>
+          <h2 class="landing-h2">Three steps. No friction.</h2>
+
+          <div class="landing-steps">
+            <div class="landing-step">
+              <div class="landing-step-num">01</div>
+              <h3>Browse shops near you</h3>
+              <p>Pick items from any combination of local businesses. Your cart keeps them organised by shop automatically.</p>
+            </div>
+            <div class="landing-step">
+              <div class="landing-step-num">02</div>
+              <h3>Pay once for everything</h3>
+              <p>One secure payment covers every shop in your cart. We split the total and settle each business fairly.</p>
+            </div>
+            <div class="landing-step">
+              <div class="landing-step-num">03</div>
+              <h3>Each shop delivers to you</h3>
+              <p>Your orders arrive separately — fresh from each kitchen, shop, or farm. Track every delivery in real time.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MERCHANT INVITE -->
+      <section class="landing-merchant">
+        <div class="landing-merchant-inner">
+          <div class="landing-merchant-text">
+            <p class="landing-eyebrow">For business owners</p>
+            <h2 class="landing-h2">Run a shop or farm?</h2>
+            <p>PXDynasty gives you an online storefront, order management, and delivery coordination — without needing your own website or logistics team.</p>
+          </div>
+          <button class="btn btn-primary" data-auth="show-merchant">Get in touch</button>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <footer class="landing-footer">
+        <div class="landing-footer-inner">
+          <div class="footer-brand">
+            <span class="landing-logo-mark" style="width:28px;height:28px;font-size:13px;">PX</span>
+            <span style="font-weight:700;">PXDynasty</span>
+          </div>
+          <p class="footer-line">Operated by Ma'aka Store Businesses · Yola, Adamawa State</p>
+          <div class="footer-links">
+            <a href="javascript:void(0)" data-auth="show-terms">Terms</a>
+            <a href="javascript:void(0)" data-auth="show-privacy">Privacy</a>
+            <a href="javascript:void(0)" data-auth="show-help">Help</a>
+            <a href="javascript:void(0)" data-auth="show-login">Sign in</a>
+          </div>
+        </div>
+      </footer>
+
     </div>
-    <section class="landing-how">
-      <div class="landing-how-inner">
-        <p class="auth-eyebrow" style="color:var(--color-accent-dark)">How it works</p>
-        <h2 class="landing-h2">Three steps. No friction.</h2>
-        <div class="landing-steps">
-          <div class="landing-step"><div class="landing-step-num">1</div><h3>Browse local</h3><p>See what's fresh at businesses around you — shops, farms, kitchens, all in one place.</p></div>
-          <div class="landing-step"><div class="landing-step-num">2</div><h3>One checkout</h3><p>Pay once. We split the payment between the business and the delivery agent automatically.</p></div>
-          <div class="landing-step"><div class="landing-step-num">3</div><h3>Tracked delivery</h3><p>A verified agent picks up your order and brings it to your door.</p></div>
-        </div>
-      </div>
-    </section>
-    <section class="landing-trust">
-      <div class="landing-trust-inner">
-        <div class="trust-item"><strong>Every business verified</strong><span>We review each seller before they go live.</span></div>
-        <div class="trust-item"><strong>Your money held safely</strong><span>Businesses only get paid when you receive your order.</span></div>
-        <div class="trust-item"><strong>Real delivery agents</strong><span>Tracked, rated, and accountable for every delivery.</span></div>
-      </div>
-    </section>
+
+    <!-- AUTH MODAL container — the login/signup/merchant form lives here -->
+    <div class="landing-auth-overlay" id="landing-auth-overlay" hidden>
+      <div class="landing-auth-sheet" id="landing-auth-sheet"></div>
+    </div>
   `;
+}
+
+function renderLandingProofCounts() {
+  // Fire-and-forget: fetch counts and update the strip. If it fails, leave dashes.
+  if (!window.PXDynastySBC || !window.PXDynastySBC.fetchCounts) return;
+  window.PXDynastySBC.fetchCounts().then((counts) => {
+    if (!counts) return;
+    const set = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n; };
+    set('proof-biz', counts.businesses);
+    set('proof-prod', counts.products);
+    set('proof-ord', counts.orders);
+  }).catch(() => {});
+}
+
+function openLandingAuth(mode) {
+  const overlay = document.getElementById('landing-auth-overlay');
+  const sheet = document.getElementById('landing-auth-sheet');
+  if (!overlay || !sheet) return;
+
+  if (mode === 'merchant') {
+    sheet.innerHTML = `
+      <div class="landing-auth-card">
+        <button class="landing-auth-close" data-auth="close-auth">×</button>
+        <p class="landing-eyebrow">For business owners</p>
+        <h2>Talk to us about selling on PXDynasty</h2>
+        <p class="text-muted" style="margin-bottom:18px;">Tell us about your business. We'll set up your storefront and send you login details.</p>
+
+        <div class="form-group"><label>Business name</label><input type="text" id="lm-bizName" placeholder="e.g. Shehu Poultry Farm" /></div>
+        <div class="form-group"><label>Owner name</label><input type="text" id="lm-ownerName" placeholder="Your name" /></div>
+        <div class="form-row">
+          <div class="form-group"><label>Phone</label><input type="tel" id="lm-phone" placeholder="080…" /></div>
+          <div class="form-group"><label>Email</label><input type="email" id="lm-email" placeholder="you@example.com" /></div>
+        </div>
+        <div class="form-group"><label>What do you sell?</label><textarea id="lm-desc" placeholder="e.g. fresh poultry, eggs, and frozen chicken" style="min-height:70px;"></textarea></div>
+        <div class="auth-error" id="lm-error"></div>
+        <button class="btn btn-primary btn-block mt-8" data-auth="submit-merchant">Send enquiry</button>
+      </div>
+    `;
+  } else {
+    sheet.innerHTML = `
+      <div class="landing-auth-card">
+        <button class="landing-auth-close" data-auth="close-auth">×</button>
+        <div id="auth-panel">${renderAuthPanel(mode)}</div>
+      </div>
+    `;
+  }
+  overlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLandingAuth() {
+  const overlay = document.getElementById('landing-auth-overlay');
+  if (overlay) overlay.hidden = true;
+  document.body.style.overflow = '';
+}
+
+async function submitMerchantEnquiry() {
+  const errEl = document.getElementById('lm-error');
+  if (errEl) errEl.textContent = '';
+  const bizName = (document.getElementById('lm-bizName') || {}).value || '';
+  const ownerName = (document.getElementById('lm-ownerName') || {}).value || '';
+  const phone = (document.getElementById('lm-phone') || {}).value || '';
+  const email = (document.getElementById('lm-email') || {}).value || '';
+  const desc = (document.getElementById('lm-desc') || {}).value || '';
+
+  if (!bizName.trim()) { if (errEl) errEl.textContent = 'Enter your business name.'; return; }
+  if (!phone.trim() && !email.trim()) { if (errEl) errEl.textContent = 'Enter a phone or email so we can reach you.'; return; }
+
+  const ticket = {
+    id: 'sup-' + Math.random().toString(36).slice(2, 10),
+    orderId: null,
+    openedById: 'public-' + Math.random().toString(36).slice(2, 8),
+    openedByRole: 'public',
+    openedByName: ownerName || bizName,
+    subject: 'Merchant signup enquiry',
+    body: `Business: ${bizName}\nOwner: ${ownerName}\nPhone: ${phone}\nEmail: ${email}\n\nWhat they sell: ${desc}`,
+    status: 'open',
+    createdAt: new Date().toISOString(),
+  };
+
+  if (window.PXDynastySBC && window.PXDynastySBC.insertTicket) {
+    const r = await window.PXDynastySBC.insertTicket(ticket);
+    if (!r.ok) { if (errEl) errEl.textContent = 'Failed: ' + (r.error || ''); return; }
+  }
+
+  closeLandingAuth();
+  alert('Thanks — we\'ll be in touch shortly.');
 }
 
 function renderAuthPanel(mode) {
@@ -572,6 +724,7 @@ async function renderAuthGate() {
   appEl.innerHTML = renderLandingPage();
   if (toastEl) toastEl.innerHTML = '';
   if (modalEl) { modalEl.classList.remove('open'); modalEl.innerHTML = ''; }
+  if (typeof renderLandingProofCounts === 'function') renderLandingProofCounts();
 }
 
 /* ---------- event wiring ---------- */
@@ -597,13 +750,24 @@ document.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-auth]');
   if (!el) return;
   const action = el.dataset.auth;
-  if (action === 'show-login') { authShowPanel('login'); return; }
-  if (action === 'show-signup') { authShowPanel('signup'); return; }
+
+  // Landing interactions
+  if (action === 'show-login') { openLandingAuth('login'); return; }
+  if (action === 'show-signup') { openLandingAuth('signup'); return; }
+  if (action === 'show-merchant') { openLandingAuth('merchant'); return; }
+  if (action === 'close-auth') { closeLandingAuth(); return; }
+  if (action === 'submit-merchant') { submitMerchantEnquiry(); return; }
+  if (action === 'show-terms') { openLandingInfo('terms'); return; }
+  if (action === 'show-privacy') { openLandingInfo('privacy'); return; }
+  if (action === 'show-help') { openLandingInfo('help'); return; }
+
+  // Auth submit (form lives in the modal)
   if (action === 'do-login') {
     const { email, password } = authReadForm();
     authShowError('Signing in…');
     const res = await authLogin(email, password);
     if (!res.ok) { authShowError(res.error); return; }
+    closeLandingAuth();
     await renderAuthGate();
     return;
   }
@@ -612,10 +776,42 @@ document.addEventListener('click', async (e) => {
     authShowError('Creating account…');
     const res = await authSignup(email, password, name);
     if (!res.ok) { authShowError(res.error); return; }
+    closeLandingAuth();
     await renderAuthGate();
     return;
   }
   if (action === 'logout') { authLogout(); return; }
+});
+
+/* Simple read-only info modal used by the footer links. */
+function openLandingInfo(kind) {
+  const overlay = document.getElementById('landing-auth-overlay');
+  const sheet = document.getElementById('landing-auth-sheet');
+  if (!overlay || !sheet) return;
+  const bodies = {
+    terms: `<h2>Terms of service</h2>
+      <p class="text-muted" style="line-height:1.7;">PXDynasty connects customers, local businesses, and delivery agents. When you place an order, the business fulfils it and the platform processes payment via Paystack. Disputes must be raised within 24 hours of delivery.</p>
+      <p class="text-muted" style="line-height:1.7;">Businesses are responsible for the accuracy of their listings. Delivery agents are independent contractors. Full terms available on request.</p>`,
+    privacy: `<h2>Privacy policy</h2>
+      <p class="text-muted" style="line-height:1.7;">We collect your name, phone, email, delivery address, and order history. Card data is handled entirely by Paystack and never touches PXDynasty systems.</p>
+      <p class="text-muted" style="line-height:1.7;">The business fulfilling your order and the delivery agent see only the information needed to complete the delivery. We do not sell your data.</p>`,
+    help: `<h2>Help &amp; support</h2>
+      <p class="text-muted" style="line-height:1.7;">For order issues, use the <strong>Contact support</strong> button on any order page. For general enquiries or business onboarding, reach us on WhatsApp at <strong>+234 906 320 0718</strong> or email <strong>hello@pxdynasty.com</strong>.</p>`,
+  };
+  sheet.innerHTML = `
+    <div class="landing-auth-card">
+      <button class="landing-auth-close" data-auth="close-auth">×</button>
+      ${bodies[kind] || ''}
+    </div>
+  `;
+  overlay.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+/* Close on backdrop click. */
+document.addEventListener('click', (e) => {
+  const overlay = document.getElementById('landing-auth-overlay');
+  if (overlay && !overlay.hidden && e.target === overlay) closeLandingAuth();
 });
 
 document.addEventListener('keydown', (e) => {

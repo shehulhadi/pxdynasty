@@ -422,6 +422,27 @@ async function sbcUpdateTicket(id, patch) {
   return { ok: true };
 }
 
+/* Lightweight public counts for the landing page proof strip. */
+async function sbcFetchCounts() {
+  const c = sbcInit();
+  if (!c) return null;
+  try {
+    const [bizRes, prodRes, ordRes] = await Promise.all([
+      c.from('businesses').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+      c.from('products').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+      c.from('orders').select('id', { count: 'exact', head: true }),
+    ]);
+    return {
+      businesses: bizRes.count || 0,
+      products: prodRes.count || 0,
+      orders: ordRes.count || 0,
+    };
+  } catch (e) {
+    console.error('fetchCounts', e);
+    return null;
+  }
+}
+
 /* Expose globally for app.js to call. */
 window.PXDynastySBC = {
   init: sbcInit,
@@ -441,4 +462,5 @@ window.PXDynastySBC = {
   fetchTickets: sbcFetchTickets,
   insertTicket: sbcInsertTicket,
   updateTicket: sbcUpdateTicket,
+  fetchCounts: sbcFetchCounts,
 };
