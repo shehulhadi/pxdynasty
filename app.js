@@ -1757,19 +1757,35 @@ function distanceForOrder(order) { return (1.5 + ((order.orderNumber.slice(-2) *
 function agentJobs(agent) {
   const availableOrders = getOrders({ status: 'preparing' }).filter((o) => !o.agentId).slice(0, 8);
   const isOffline = agent.status === 'offline';
+  const todayStr = new Date().toDateString();
+  const myOrders = getOrders({ agentId: agent.id });
+  const todaysDone = myOrders.filter((o) => o.status === 'delivered' && new Date(o.createdAt).toDateString() === todayStr).length;
+  const pendingMine = myOrders.filter((o) => ['agent_assigned', 'picked_up', 'out_for_delivery'].includes(o.status)).length;
+  const statusColor = isOffline ? 'var(--color-text-muted)' : 'var(--color-success)';
+  const statusLabel = isOffline ? 'Offline — not receiving jobs' : 'Online — receiving jobs';
   return `
     <div class="page-head"><div><h1>Delivery jobs</h1><div class="sub">${escapeHtml(agent.name)} · ${agent.vehicle}</div></div>
-      <button class="chip ${agent.status === 'online' ? 'on' : ''}" data-action="toggle-agent-status">${agent.status === 'offline' ? 'Go online' : 'Go offline'}</button>
+      <button class="chip ${agent.status === 'online' ? 'on' : ''}" data-action="toggle-agent-status">${isOffline ? 'Go online' : 'Go offline'}</button>
     </div>
-    <div class="metric-grid">
-      ${metricCard('Today\'s deliveries', 0, '')}
-      ${metricCard('Completed', agent.completedDeliveries || 0, '')}
-      ${metricCard('Pending', getOrders({ agentId: agent.id, status: ['agent_assigned', 'picked_up', 'out_for_delivery'] }).length, '')}
+
+    <div class="card" style="display:flex;align-items:center;gap:10px;padding:12px 14px;">
+      <span style="width:10px;height:10px;border-radius:50%;background:${statusColor};flex-shrink:0;"></span>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:13.5px;">${statusLabel}</div>
+        <div class="text-sm text-muted">${escapeHtml(agent.operatingArea || 'No operating area set')}</div>
+      </div>
+    </div>
+
+    <div class="metric-grid mt-12">
+      ${metricCard('Delivered today', todaysDone, 'completed')}
+      ${metricCard('Pending', pendingMine, 'in progress')}
+      ${metricCard('Lifetime completed', agent.completedDeliveries || 0, '')}
       ${metricCard('Today\'s earnings', formatNaira(agent.earningsToday || 0), '')}
     </div>
+
     ${isOffline ? emptyState('bike', 'You are offline', 'Go online to start receiving delivery job offers.', `<button class="btn btn-primary btn-sm" data-action="toggle-agent-status">Go online</button>`) : `
-    <div class="section-title-row" style="margin-top:20px;"><h2>Available jobs</h2></div>
-    ${availableOrders.length ? `<div class="row-cards">${availableOrders.map((o) => agentJobCardHtml(o)).join('')}</div>` : emptyState('box', 'No jobs available right now', 'New delivery jobs will appear here as businesses prepare orders.', null)}
+    <div class="section-title-row" style="margin-top:20px;"><h2>Available jobs${availableOrders.length ? ' · ' + availableOrders.length : ''}</h2></div>
+    ${availableOrders.length ? `<div class="row-cards">${availableOrders.map((o) => agentJobCardHtml(o)).join('')}</div>` : emptyState('box', 'No jobs available right now', 'New delivery jobs appear here as businesses prepare orders. Pull to refresh in a moment.', null)}
     `}
   `;
 }
@@ -1795,23 +1811,54 @@ function agentActiveDelivery(agent) {
   const biz = getBusiness(active.businessId) || { name: 'Business', address: '', phone: '' };
   const cust = getCustomer(active.customerId) || { name: 'Customer', phone: '' };
   const stage = active.status;
+  const elapsed = (() => {
+    const mins = Math.max(0, Math.floor((Date.now() - new Date(active.createdAt).getTime()) / 60000));
+    if (mins < 60) return mins + ' min';
+    const h = Math.floor(mins / 60); const m = mins % 60;
+    return h + 'h ' + m + 'm';
+  })();
+  const stageLabel = stage === 'agent_assigned' ? 'Pickup pending'
+    : stage === 'picked_up' ? 'On the way to customer'
+    : 'Out for delivery';
   return `
-    <div class="page-head"><h1>Active delivery</h1><span class="status-badge status-accent">${formatNaira(active.financial.agentPayment)}</span></div>
+    <div class="page-head">
+      <div><h1>Active delivery</h1><div class="sub">${escapeHtml(stageLabel)} · ${elapsed} elapsed</div></div>
+      <span class="status-badge status-accent">${formatNaira(active.financial.agentPayment)}</span>
+    </div>
+
     <div class="card">
       <div class="flex items-center justify-between"><strong>${active.orderNumber}</strong>${orderStatusBadge(active.status)}</div>
       <hr class="divider" />
       <div class="flex items-start gap-10"><div style="color:var(--color-primary);">${ICONS.store}</div>
-        <div><strong style="font-size:13.5px;">${escapeHtml(biz.name)}</strong><div class="text-sm text-muted">${escapeHtml(biz.address)}</div><div class="text-sm text-muted">${escapeHtml(biz.phone)}</div></div>
+        <div style="flex:1;">
+          <div class="text-sm text-faint" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Pickup from</div>
+          <strong style="font-size:14px;">${escapeHtml(biz.name)}</strong>
+          <div class="text-sm text-muted">${escapeHtml(biz.address || 'No address on file')}</div>
+          ${biz.phone ? `<div class="text-sm text-muted">${escapeHtml(biz.phone)}</div>` : ''}
+        </div>
       </div>
       <div class="flex items-start gap-10 mt-12"><div style="color:var(--color-accent-dark);">${ICONS.location}</div>
-        <div><strong style="font-size:13.5px;">${escapeHtml(cust.name)}</strong>${cust.phone ? `<div class="text-sm text-muted">${escapeHtml(cust.phone)}</div>` : ''}<div class="text-sm text-muted">${escapeHtml(active.deliveryAddress)}</div></div>
+        <div style="flex:1;">
+          <div class="text-sm text-faint" style="text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Deliver to</div>
+          <strong style="font-size:14px;">${escapeHtml(cust.name)}</strong>
+          ${cust.phone ? `<div class="text-sm text-muted">${escapeHtml(cust.phone)}</div>` : ''}
+          <div class="text-sm text-muted">${escapeHtml(active.deliveryAddress)}</div>
+        </div>
       </div>
-      ${active.deliveryInstructions ? `<p class="text-sm text-faint mt-8" style="margin-bottom:0;">Instructions: ${escapeHtml(active.deliveryInstructions)}</p>` : ''}
+      ${active.deliveryInstructions ? `<p class="text-sm text-faint mt-12" style="margin-bottom:0;padding:8px 10px;background:var(--color-surface-alt);border-radius:8px;">Note from customer: ${escapeHtml(active.deliveryInstructions)}</p>` : ''}
     </div>
 
     <div class="card mt-12">
-      <strong style="font-size:13px;">Items</strong>
+      <div class="flex items-center justify-between"><strong style="font-size:13px;">Items to pick up</strong><span class="text-sm text-muted">${active.items.length} item${active.items.length === 1 ? '' : 's'}</span></div>
       <div class="mt-8">${active.items.map((it) => `<div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span></div>`).join('')}</div>
+    </div>
+
+    <div class="card mt-12" style="background:var(--color-primary-tint);border-color:var(--color-primary);">
+      <div class="flex items-center justify-between">
+        <span class="text-sm" style="color:var(--color-primary-dark);font-weight:700;">You will earn</span>
+        <strong style="font-size:20px;color:var(--color-primary-dark);">${formatNaira(active.financial.agentPayment)}</strong>
+      </div>
+      <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-primary-dark);">Paid out to your account after the customer confirms delivery.</p>
     </div>
 
     <div class="flex gap-10 mt-12">
@@ -1838,16 +1885,57 @@ function agentActiveDelivery(agent) {
 
 function agentEarnings(agent) {
   const history = getOrders({ agentId: agent.id, status: 'delivered' });
+  const lifetime = history.reduce((s, o) => s + (o.financial.agentPayment || 0), 0);
+  const avg = history.length ? Math.round(lifetime / history.length) : 0;
+
+  // 7-day chart data
+  const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d; });
+  const perDay = days.map((d) => {
+    const dayStr = d.toDateString();
+    return history.filter((o) => new Date(o.createdAt).toDateString() === dayStr)
+                  .reduce((s, o) => s + (o.financial.agentPayment || 0), 0);
+  });
+  const maxDay = Math.max(...perDay, 1);
+
   return `
     <div class="page-head"><h1>Earnings</h1></div>
-    <div class="metric-grid">
+
+    <div class="card" style="background:linear-gradient(120deg,var(--color-primary-dark) 0%,var(--color-primary) 100%);color:#fff;border:none;">
+      <div class="text-sm" style="opacity:.85;font-weight:700;letter-spacing:.05em;text-transform:uppercase;">Available balance</div>
+      <div style="font-family:var(--font-display);font-size:34px;font-weight:700;margin:6px 0 4px;">${formatNaira(agent.earningsPending || 0)}</div>
+      <div class="text-sm" style="opacity:.85;">Pending payout to your bank account</div>
+    </div>
+
+    <div class="metric-grid mt-12">
       ${metricCard('Today', formatNaira(agent.earningsToday || 0), '')}
       ${metricCard('This week', formatNaira(agent.earningsWeek || 0), '')}
-      ${metricCard('Completed deliveries', agent.completedDeliveries || 0, '')}
-      ${metricCard('Pending payout', formatNaira(agent.earningsPending || 0), '')}
+      ${metricCard('Lifetime', formatNaira(lifetime), '')}
+      ${metricCard('Paid out', formatNaira(agent.earningsPaid || 0), '')}
     </div>
-    <div class="section-title-row"><h2>Delivery history</h2></div>
-    ${history.length ? `<div class="row-cards">${history.slice(0, 10).map((o) => `<div class="row-card flex items-center justify-between"><div><div style="font-weight:700;font-size:13.5px;">${o.orderNumber}</div><div class="text-sm text-muted">${formatDate(o.createdAt)}</div></div><div style="font-weight:800;color:var(--color-success);">+${formatNaira(o.financial.agentPayment)}</div></div>`).join('')}</div>` : emptyState('wallet', 'No earnings yet', 'Completed deliveries will appear here.', null)}
+
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Last 7 days</strong>
+      <div class="bar-chart" style="margin-top:14px;">
+        ${perDay.map((v, i) => `<div class="bar-col">
+          <div class="bar" style="height:${Math.max(4, (v / maxDay) * 110)}px;"></div>
+          <span class="lbl">${days[i].toLocaleDateString('en-NG', { weekday: 'short' })}</span>
+        </div>`).join('')}
+      </div>
+      <p class="text-sm text-muted mt-12" style="margin-bottom:0;">Avg per delivery: <strong style="color:var(--color-text);">${formatNaira(avg)}</strong></p>
+    </div>
+
+    <div class="section-title-row"><h2>Delivery history</h2><span class="text-sm text-muted">${history.length} total</span></div>
+    ${history.length ? `<div class="row-cards">${history.slice(0, 15).map((o) => {
+      const b = getBusiness(o.businessId) || {};
+      return `<div class="row-card">
+        <div class="row-card-top">
+          <span class="row-card-title">${o.orderNumber}</span>
+          <span style="font-weight:800;color:var(--color-success);">+${formatNaira(o.financial.agentPayment)}</span>
+        </div>
+        <div class="row-card-sub">${escapeHtml(b.name || '')}</div>
+        <div class="row-card-sub">${formatDate(o.createdAt)}</div>
+      </div>`;
+    }).join('')}</div>` : emptyState('wallet', 'No earnings yet', 'Completed deliveries will appear here.', null)}
   `;
 }
 
@@ -1864,17 +1952,50 @@ function agentHistory(agent) {
 }
 
 function agentProfile(agent) {
+  const lifetimeOrders = getOrders({ agentId: agent.id, status: 'delivered' });
+  const lifetimeEarned = lifetimeOrders.reduce((s, o) => s + (o.financial.agentPayment || 0), 0);
+  const memberSince = agent.createdAt ? new Date(agent.createdAt).toLocaleDateString('en-NG', { month: 'long', year: 'numeric' }) : '—';
+  const auth = window.PXDynastyAuth && window.PXDynastyAuth.currentUserSync && window.PXDynastyAuth.currentUserSync();
   return `
     <div class="page-head"><h1>Profile</h1></div>
-    <div class="card flex items-center gap-12">
-      <div style="width:52px;height:52px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:18px;">${initials(agent.name)}</div>
-      <div><strong style="font-size:15px;">${escapeHtml(agent.name)}</strong><div class="text-sm text-muted">${escapeHtml(agent.phone || '')} · ${agent.vehicle}</div></div>
+
+    <div class="card" style="text-align:center;padding:22px 16px;">
+      <div style="width:72px;height:72px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:26px;margin:0 auto 12px;">${initials(agent.name)}</div>
+      <strong style="font-size:18px;">${escapeHtml(agent.name)}</strong>
+      ${agent.verified ? `<div class="flex items-center gap-6 mt-8" style="justify-content:center;color:var(--color-primary);font-weight:700;font-size:13px;">${ICONS.verified} Verified agent</div>` : `<div class="text-sm text-muted mt-8">Verification pending</div>`}
+      <div class="text-sm text-muted mt-8">Member since ${memberSince}</div>
     </div>
+
+    <div class="metric-grid mt-12">
+      ${metricCard('Completed', agent.completedDeliveries || 0, 'deliveries')}
+      ${metricCard('Rating', (agent.rating && agent.rating !== '—') ? '⭐ ' + agent.rating : 'No ratings yet', '')}
+      ${metricCard('Lifetime earned', formatNaira(lifetimeEarned), '')}
+      ${metricCard('Pending payout', formatNaira(agent.earningsPending || 0), '')}
+    </div>
+
     <div class="card mt-12">
-      <div class="summary-row"><span>Status</span><span class="val">${agent.status}</span></div>
-      <div class="summary-row"><span>Operating area</span><span class="val">${escapeHtml(agent.operatingArea || '')}</span></div>
-      <div class="summary-row"><span>Rating</span><span class="val">⭐ ${agent.rating || '—'}</span></div>
+      <strong style="font-size:13px;">Details</strong>
+      <div class="summary-row mt-8"><span>Phone</span><span class="val">${escapeHtml(agent.phone || 'Not set')}</span></div>
+      <div class="summary-row"><span>Vehicle</span><span class="val">${escapeHtml(agent.vehicle || '—')}</span></div>
+      <div class="summary-row"><span>Operating area</span><span class="val">${escapeHtml(agent.operatingArea || 'Not set')}</span></div>
+      <div class="summary-row"><span>Status</span><span class="val" style="text-transform:capitalize;">${escapeHtml(agent.status || 'offline')}</span></div>
+      ${auth ? `<div class="summary-row"><span>Login email</span><span class="val" style="font-size:12.5px;">${escapeHtml(auth.email)}</span></div>` : ''}
     </div>
+
+    <div class="card mt-12" style="padding:0;">
+      <div class="flex items-center justify-between pressable" style="padding:14px 16px;border-bottom:1px solid var(--color-border);cursor:pointer;" data-action="contact-support">
+        <div class="flex items-center gap-10">${ICONS.phone}<span style="font-weight:600;font-size:14px;">Contact support</span></div>
+        ${ICONS.chevronRight}
+      </div>
+      <div class="flex items-center justify-between pressable" style="padding:14px 16px;cursor:pointer;" data-action="nav" data-view="agent-earnings">
+        <div class="flex items-center gap-10">${ICONS.wallet}<span style="font-weight:600;font-size:14px;">View earnings</span></div>
+        ${ICONS.chevronRight}
+      </div>
+    </div>
+
+    <button class="btn btn-outline btn-block mt-16" style="color:var(--color-error);border-color:var(--color-error);" data-action="do-logout">
+      ${ICONS.logout} Log out
+    </button>
   `;
 }
 
