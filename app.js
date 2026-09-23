@@ -3020,6 +3020,20 @@ let _chatLastIds = new Set();
 let _chatAllMessages = [];
 let _chatActiveChannel = 'all';
 
+function isBusinessSideUser() {
+  const me = currentSenderInfo();
+  return me.role === 'business' || me.role === 'staff';
+}
+
+function isChatLockedForMe(order) {
+  if (!order || !order.chatClaimedBy) return false;
+  const me = currentSenderInfo();
+  // Only business-side users are locked by the claim.
+  if (!isBusinessSideUser()) return false;
+  // The claimer can send.
+  return order.chatClaimedBy !== me.id;
+}
+
 function currentSenderInfo() {
   const u = window.PXDynastyAuth && window.PXDynastyAuth.currentUserSync && window.PXDynastyAuth.currentUserSync();
   if (u) {
@@ -3128,6 +3142,51 @@ async function loadChatMessages(orderId) {
   renderChatMessages();
 }
 
+function chatClaimBannerHtml(order) {
+  const me = currentSenderInfo();
+  if (!isBusinessSideUser()) return '';
+
+  const claimedByMe = order.chatClaimedBy === me.id;
+  const claimedByName = order.chatClaimedByName || 'Another teammate';
+
+  if (!order.chatClaimedBy) {
+    return `<div class="card" style="background:var(--color-accent-tint);border-color:var(--color-accent);margin-bottom:10px;padding:10px 12px;">
+      <div class="flex items-center justify-between">
+        <div>
+          <strong style="font-size:12.5px;color:var(--color-accent-dark);">Unclaimed chat</strong>
+          <p class="text-sm mt-4" style="margin:0;color:var(--color-accent-dark);">Claim this chat so teammates know you're handling it.</p>
+        </div>
+        <button class="btn btn-primary btn-sm" data-action="chat-claim-order" data-order-id="${order.id}">Claim</button>
+      </div>
+    </div>`;
+  }
+
+  if (claimedByMe) {
+    return `<div class="card" style="background:var(--color-primary-tint);border-color:var(--color-primary);margin-bottom:10px;padding:10px 12px;">
+      <div class="flex items-center justify-between">
+        <div>
+          <strong style="font-size:12.5px;color:var(--color-primary-dark);">You are handling this chat</strong>
+          <p class="text-sm mt-4" style="margin:0;color:var(--color-primary-dark);">Teammates can read but cannot reply.</p>
+        </div>
+        <button class="btn btn-outline btn-sm" data-action="chat-release-order" data-order-id="${order.id}">Release</button>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="card" style="background:var(--color-surface-alt);border-color:var(--color-border);margin-bottom:10px;padding:10px 12px;">
+    <strong style="font-size:12.5px;">Claimed by ${escapeHtml(claimedByName)}</strong>
+    <p class="text-sm mt-4" style="margin:0;color:var(--color-text-muted);">You can read this chat but not reply. Ask them to release it if you need to take over.</p>
+  </div>`;
+}
+
+function renderChatClaimBanner() {
+  const wrap = document.getElementById('chat-claim-banner');
+  if (!wrap) return;
+  const order = getOrder(_chatOrderId);
+  if (!order) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = chatClaimBannerHtml(order);
+}
+
 function openOrderChat(orderId) {
   const order = getOrder(orderId);
   if (!order) { toast('Order not found', 'error'); return; }
@@ -3138,6 +3197,7 @@ function openOrderChat(orderId) {
   _chatActiveChannel = 'all';
 
   const me = currentSenderInfo();
+  const locked = isChatLockedForMe(order);
 
   openModal(`
     <div class="modal-head">
@@ -3147,34 +3207,48 @@ function openOrderChat(orderId) {
       </div>
       <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
     </div>
+    <div id="chat-claim-banner"></div>
     <div id="chat-tabs" style="display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--color-border);padding-bottom:2px;margin-bottom:8px;"></div>
     <div id="chat-messages" style="max-height:320px;overflow-y:auto;padding:10px 4px 6px;border-radius:var(--radius-sm);background:var(--color-bg);"></div>
     <div style="display:flex;gap:8px;margin-top:12px;">
-      <input type="text" id="chat-input" placeholder="Type a message…" style="flex:1;" autocomplete="off" />
-      <button class="btn btn-primary" data-action="chat-send" data-order-id="${order.id}">Send</button>
+      <input type="text" id="chat-input" placeholder="${locked ? 'Chat is locked to another teammate' : 'Type a message…'}" style="flex:1;" autocomplete="off" ${locked ? 'disabled' : ''} />
+      <button class="btn btn-primary" data-action="chat-send" data-order-id="${order.id}" ${locked ? 'disabled' : ''}>Send</button>
     </div>
     <p class="text-sm text-faint" style="margin-top:8px;text-align:center;">Messages on this tab are visible only to the parties shown.</p>
   `);
 
+  renderChatClaimBanner();
   renderChatTabs();
   renderChatMessages();
   loadChatMessages(orderId);
-  _chatPollTimer = setInterval(() => loadChatMessages(orderId), 4000);
+  _chatPollTimer = setInterval(() => {
+    loadChatMessages(orderId);
+    // Also refresh the claim state so releases propagate.
+    if (window.PXDynastySBC && window.PXDynastySBC.fetchAll) {
+      // Cheaper: only re-fetch if the order's claim has changed.
+      // For now, re-render from the local object — cloud sync happens on next hydrate.
+    }
+  }, 4000);
 
   const input = document.getElementById('chat-input');
-  if (input) {
+  if (input && !locked) {
     input.focus();
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         const btn = document.querySelector('[data-action="chat-send"]');
-        if (btn) btn.click();
+        if (btn && !btn.disabled) btn.click();
       }
     });
   }
 }
 
 async function sendChatMessage(orderId) {
+  const order = getOrder(orderId);
+  if (isChatLockedForMe(order)) {
+    toast('Chat is locked to another teammate', 'error');
+    return;
+  }
   const input = document.getElementById('chat-input');
   if (!input) return;
   const body = String(input.value || '').trim();
@@ -3779,6 +3853,44 @@ function handleAction(el, ev) {
     case 'open-order-summary': openOrderSummary(el.dataset.orderId); break;
     case 'open-order-chat': openOrderChat(el.dataset.orderId); break;
     case 'chat-set-channel': setChatChannel(el.dataset.channel); break;
+    case 'chat-claim-order': {
+      const id = el.dataset.orderId;
+      const order = getOrder(id);
+      if (!order) break;
+      if (!isBusinessSideUser()) { toast('Only business-side users can claim', 'error'); break; }
+      if (order.chatClaimedBy) { toast('Already claimed', 'info'); break; }
+      const me = currentSenderInfo();
+      order.chatClaimedBy = me.id;
+      order.chatClaimedByName = me.name;
+      order.chatClaimedAt = new Date().toISOString();
+      saveDataLocalOnly();
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertOrder) {
+        window.PXDynastySBC.upsertOrder(order).catch(() => {});
+      }
+      toast('Chat claimed', 'success');
+      renderChatClaimBanner();
+      // Re-open input by re-rendering the modal.
+      openOrderChat(id);
+      break;
+    }
+    case 'chat-release-order': {
+      const id = el.dataset.orderId;
+      const order = getOrder(id);
+      if (!order) break;
+      if (!isBusinessSideUser()) break;
+      const me = currentSenderInfo();
+      if (order.chatClaimedBy !== me.id) { toast('You are not the claimer', 'error'); break; }
+      order.chatClaimedBy = null;
+      order.chatClaimedByName = null;
+      order.chatClaimedAt = null;
+      saveDataLocalOnly();
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertOrder) {
+        window.PXDynastySBC.upsertOrder(order).catch(() => {});
+      }
+      toast('Chat released', 'success');
+      openOrderChat(id);
+      break;
+    }
     case 'address-open': openAddressModal(el.dataset.id || null); break;
     case 'address-save': {
       const id = el.dataset.id || '';

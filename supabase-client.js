@@ -91,6 +91,9 @@ function sbcRowToOrder(r) {
     paymentReference: r.payment_reference || null,
     paymentVerifiedAt: r.payment_verified_at || null,
     pickupChecklist: r.pickup_checklist || {},
+    chatClaimedBy: r.chat_claimed_by || null,
+    chatClaimedByName: r.chat_claimed_by_name || null,
+    chatClaimedAt: r.chat_claimed_at || null,
     createdAt: r.created_at,
   };
 }
@@ -160,6 +163,9 @@ function sbcOrderToRow(o) {
     payment_reference: o.paymentReference || null,
     payment_verified_at: o.paymentVerifiedAt || null,
     pickup_checklist: o.pickupChecklist || {},
+    chat_claimed_by: o.chatClaimedBy || null,
+    chat_claimed_by_name: o.chatClaimedByName || null,
+    chat_claimed_at: o.chatClaimedAt || null,
   };
 }
 function sbcCustomerToRow(c) {
