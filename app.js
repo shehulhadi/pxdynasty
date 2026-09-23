@@ -1376,7 +1376,10 @@ function customerOrdersList() {
 function customerOrderCardHtml(o) {
   const biz = getBusiness(o.businessId) || { name: 'Business' };
   return `<div class="row-card">
-    <div class="row-card-top"><span class="row-card-title">${o.orderNumber}</span>${orderStatusBadge(o.status)}</div>
+    <div class="row-card-top" data-action="open-order-summary" data-order-id="${o.id}" style="cursor:pointer;">
+      <span class="row-card-title">${o.orderNumber}</span>
+      <div class="flex items-center gap-6">${orderStatusBadge(o.status)}${ICONS.chevronRight}</div>
+    </div>
     <div class="row-card-sub">${escapeHtml(biz.name)} · ${formatDate(o.createdAt)}</div>
     <div class="row-card-sub">${o.items.length} item(s) · ${formatNaira(o.total)}</div>
     <div class="row-card-actions">
@@ -1393,6 +1396,7 @@ function customerOrderDetail(orderId) {
   return `
     ${backBtn('Back')}
     <div class="page-head"><div><h1>${order.orderNumber}</h1><div class="sub">${escapeHtml(biz.name)} · ${formatDate(order.createdAt)}</div></div>${orderStatusBadge(order.status)}</div>
+    <button class="btn btn-ghost btn-sm" data-action="open-order-summary" data-order-id="${order.id}" style="margin-bottom:8px;">View full summary ${ICONS.chevronRight}</button>
     <div class="card">
       <strong style="font-size:13px;">Items</strong>
       <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
@@ -1663,7 +1667,10 @@ function businessOrderCardHtml(o, withActions) {
   const cust = getCustomer(o.customerId) || { name: 'Customer' };
   const nextAction = BIZ_ORDER_STATUS_STEPS[o.status];
   return `<div class="row-card">
-    <div class="row-card-top"><span class="row-card-title">${o.orderNumber}</span>${orderStatusBadge(o.status)}</div>
+    <div class="row-card-top" data-action="open-order-summary" data-order-id="${o.id}" style="cursor:pointer;">
+      <span class="row-card-title">${o.orderNumber}</span>
+      <div class="flex items-center gap-6">${orderStatusBadge(o.status)}${ICONS.chevronRight}</div>
+    </div>
     <div class="row-card-sub">${escapeHtml(cust.name)} · ${o.items.length} item(s) · ${formatNaira(o.total)}</div>
     <div class="row-card-sub">${timeAgo(o.createdAt)}</div>
     <div class="row-card-actions">
@@ -1683,6 +1690,7 @@ function businessOrderDetail(orderId) {
   return `
     ${backBtn('Orders')}
     <div class="page-head"><div><h1>${order.orderNumber}</h1><div class="sub">${formatDate(order.createdAt)}</div></div>${orderStatusBadge(order.status)}</div>
+    <button class="btn btn-ghost btn-sm" data-action="open-order-summary" data-order-id="${order.id}" style="margin-bottom:8px;">View full summary ${ICONS.chevronRight}</button>
     <div class="grid-2">
       <div>
         <div class="card"><strong style="font-size:13px;">Items</strong>
@@ -2426,7 +2434,10 @@ function adminDashboard() {
 
 function adminOrderCardHtml(o) {
   return `<div class="row-card">
-    <div class="row-card-top"><span class="row-card-title">${o.orderNumber}</span>${orderStatusBadge(o.status)}</div>
+    <div class="row-card-top" data-action="open-order-summary" data-order-id="${o.id}" style="cursor:pointer;">
+      <span class="row-card-title">${o.orderNumber}</span>
+      <div class="flex items-center gap-6">${orderStatusBadge(o.status)}${ICONS.chevronRight}</div>
+    </div>
     <div class="row-card-sub">${escapeHtml((getCustomer(o.customerId) || {}).name || '')} → ${escapeHtml((getBusiness(o.businessId) || {}).name || '')}</div>
     <div class="row-card-sub">${formatNaira(o.total)} · ${timeAgo(o.createdAt)}</div>
     <div class="row-card-actions"><button class="btn btn-outline btn-sm" data-action="nav" data-view="admin-order-detail" data-order-id="${o.id}">View</button></div>
@@ -2558,6 +2569,9 @@ function adminOrderDetail(orderId) {
   return `
     ${backBtn('Orders')}
     <div class="page-head"><div><h1>${o.orderNumber}</h1><div class="sub">${formatDate(o.createdAt)}</div></div>${orderStatusBadge(o.status)}</div>
+    <div class="flex gap-8" style="margin-bottom:12px;">
+      <button class="btn btn-ghost btn-sm" data-action="open-order-summary" data-order-id="${o.id}">Full summary ${ICONS.chevronRight}</button>
+    </div>
     <div class="mt-0 mb-12" style="margin-bottom:12px;">${orderChatButton(o.id, 'Open order chat')}</div>
     <div class="grid-2">
       <div>
