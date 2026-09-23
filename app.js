@@ -1927,6 +1927,11 @@ function renderAgentView() {
   }
 }
 
+function distanceFromOrderNumber(order) {
+  const n = parseInt(String(order.orderNumber || '').replace(/\D/g, '').slice(-3), 10) || 5;
+  return (1.5 + (n % 9) * 0.7).toFixed(1);
+}
+
 function distanceForOrder(order) { return (1.5 + ((order.orderNumber.slice(-2) * 1) % 9)).toFixed(1); }
 
 function agentJobs(agent) {
@@ -1953,6 +1958,18 @@ function agentJobs(agent) {
       </div>
     </div>
 
+    ${pendingMine > 0 ? `
+      <div class="card mt-12" style="background:var(--color-accent-tint);border-color:var(--color-accent);">
+        <div class="flex items-center justify-between">
+          <div>
+            <strong style="font-size:13.5px;color:var(--color-accent-dark);">You have ${pendingMine} active deliver${pendingMine === 1 ? 'y' : 'ies'}</strong>
+            <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-accent-dark);">You can take more jobs in parallel. Tap Open to manage the current ones.</p>
+          </div>
+          <button class="btn btn-primary btn-sm" data-action="nav" data-view="active-delivery">Open</button>
+        </div>
+      </div>
+    ` : ''}
+
     <div class="metric-grid mt-12">
       ${metricCard('Delivered today', todaysDone, 'completed')}
       ${metricCard('Pending', pendingMine, 'in progress')}
@@ -1969,7 +1986,7 @@ function agentJobs(agent) {
 
 function agentJobCardHtml(o) {
   const biz = getBusiness(o.businessId) || { name: 'Business', address: '' };
-  const dist = distanceForOrder(o);
+  const dist = distanceFromOrderNumber(o);
   return `<div class="row-card">
     <div class="row-card-top"><span class="row-card-title">${o.orderNumber}</span><span class="status-badge status-accent">${formatNaira(o.financial.agentPayment)}</span></div>
     <div class="row-card-sub">${ICONS.store} Pickup: ${escapeHtml(biz.name)}, ${escapeHtml(biz.address)}</div>
@@ -1983,8 +2000,15 @@ function agentJobCardHtml(o) {
 }
 
 function agentActiveDelivery(agent) {
-  const active = getOrders({ agentId: agent.id, status: ['agent_assigned', 'picked_up', 'out_for_delivery'] })[0];
-  if (!active) return emptyState('truck', 'No active delivery', 'Accept a job from the Jobs tab to get started.', `<button class="btn btn-primary btn-sm" data-action="nav" data-view="jobs">View jobs</button>`);
+  const actives = getOrders({ agentId: agent.id, status: ['agent_assigned', 'picked_up', 'out_for_delivery'] });
+  if (!actives.length) return emptyState('truck', 'No active delivery', 'Accept a job from the Jobs tab to get started.', `<button class="btn btn-primary btn-sm" data-action="nav" data-view="jobs">View jobs</button>`);
+  // Honor focused order if set; otherwise most recent first.
+  let active = actives[0];
+  if (agent.focusedOrderId) {
+    const focused = actives.find((o) => o.id === agent.focusedOrderId);
+    if (focused) active = focused;
+  }
+  const others = actives.filter((o) => o.id !== active.id);
   const biz = getBusiness(active.businessId) || { name: 'Business', address: '', phone: '' };
   const cust = getCustomer(active.customerId) || { name: 'Customer', phone: '' };
   const stage = active.status;
@@ -2123,6 +2147,23 @@ function agentActiveDelivery(agent) {
         </div>
         <p class="text-sm mt-8" style="margin-bottom:0;color:var(--color-accent-dark);">The customer confirms receipt in their app once you hand over the order. If they can't, use the button below to report the issue.</p>
         <button class="btn btn-outline btn-block mt-12" data-action="agent-customer-unreachable" data-order-id="${active.id}">Customer not answering</button>
+      </div>
+    ` : ''}
+
+    ${others.length ? `
+      <div class="section-title-row"><h2>Also assigned to you</h2><span class="text-sm text-muted">${others.length}</span></div>
+      <div class="row-cards">
+        ${others.map((o) => {
+          const ob = getBusiness(o.businessId) || { name: 'Business' };
+          return `<div class="row-card">
+            <div class="row-card-top"><span class="row-card-title">${o.orderNumber}</span>${orderStatusBadge(o.status)}</div>
+            <div class="row-card-sub">${escapeHtml(ob.name)} → ${escapeHtml(o.deliveryAddress).slice(0, 34)}...</div>
+            <div class="row-card-sub">${escapeHtml(ORDER_FLOW_LABEL[o.status] || o.status)} · ${formatNaira(o.financial.agentPayment)}</div>
+            <div class="row-card-actions">
+              <button class="btn btn-outline btn-sm" data-action="agent-promote-order" data-order-id="${o.id}">Focus this order</button>
+            </div>
+          </div>`;
+        }).join('')}
       </div>
     ` : ''}
 
@@ -3265,6 +3306,19 @@ function handleAction(el, ev) {
     case 'agent-confirm-pickup': updateOrderStatus(el.dataset.orderId, 'picked_up'); render(); toast('Pickup confirmed', 'success'); break;
     case 'agent-start-transit': updateOrderStatus(el.dataset.orderId, 'out_for_delivery'); render(); toast('On the way to customer', 'success'); break;
     case 'agent-open-otp': openOtpModal(el.dataset.orderId); break;
+    case 'agent-promote-order': {
+      const id = el.dataset.orderId;
+      const a = getAgent(state.currentAgentId);
+      if (!a) break;
+      a.focusedOrderId = id;
+      saveDataLocalOnly();
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertAgent) {
+        window.PXDynastySBC.upsertAgent(a).catch(() => {});
+      }
+      toast('Switched to ' + id, 'success');
+      render();
+      break;
+    }
     case 'agent-toggle-checklist': {
       const id = el.dataset.orderId;
       const idx = String(el.dataset.index);
