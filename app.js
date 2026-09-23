@@ -527,17 +527,21 @@ function getNotifications(role, refId) {
   return DB.notifications.filter((n) => n.role === role && (refId == null || n.refId == null || n.refId === refId)).sort((a, b) => new Date(b.time) - new Date(a.time));
 }
 function unreadCount(role, refId) { return getNotifications(role, refId).filter((n) => !n.read).length; }
-function DynastyllRead(role, refId) {
+async function DynastyllRead(role, refId) {
   const items = getNotifications(role, refId);
+  const jobs = [];
   items.forEach((n) => {
     if (!n.read) {
       n.read = true;
       if (window.PXDynastySBC && window.PXDynastySBC.upsertNotification) {
-        window.PXDynastySBC.upsertNotification(n).catch(() => {});
+        jobs.push(window.PXDynastySBC.upsertNotification(n).catch(() => {}));
       }
     }
   });
   saveDataLocalOnly();
+  if (jobs.length) {
+    try { await Promise.all(jobs); } catch (_) {}
+  }
 }
 
 function approveBusiness(id) { const b = getBusiness(id); if (b) { b.status = 'active'; b.verified = true; saveData(DB); } }
@@ -757,12 +761,14 @@ function renderSidebar() {
    ========================================================================== */
 
 function render() {
-  document.getElementById('header-root').innerHTML = renderHeader();
+  // Render the view FIRST — this runs any side effects (like marking
+  // notifications as read) before the header computes its unread badge.
   document.getElementById('sidebar-root').innerHTML = renderSidebar();
   document.getElementById('bottomnav-root').innerHTML = renderBottomNav();
   const main = document.getElementById('main-scroll');
   main.classList.toggle('has-sidebar-pad', state.role === 'business' || state.role === 'admin');
   main.innerHTML = `<div class="content-wrap">${renderView()}</div>`;
+  document.getElementById('header-root').innerHTML = renderHeader();
   bindHeaderSearch();
   if (state.role === 'business' && state.view === 'biz-team') {
     loadStaffList();
@@ -1566,13 +1572,25 @@ function openHelpModal() {
 function notificationsView() {
   const refId = state.role === 'customer' ? state.currentCustomerId : state.role === 'business' ? state.currentBusinessId : state.role === 'agent' ? state.currentAgentId : null;
   const list = getNotifications(state.role, refId);
+  const unreadCountNow = list.filter((n) => !n.read).length;
+
+  // Mark everything read (async — fires cloud sync in the background).
   DynastyllRead(state.role, refId);
+
   return `${backBtn('Back')}
-    <div class="page-head"><h1>Notifications</h1></div>
-    ${list.length ? `<div class="card">${list.map((n) => `
-      <div class="notif-item">
-        <div class="n-icon">${ICONS[n.icon] || ICONS.bell}</div>
-        <div><div class="n-title">${escapeHtml(n.title)}</div><p class="text-sm text-muted" style="margin:2px 0 0;">${escapeHtml(n.body)}</p><div class="n-time">${timeAgo(n.time)}</div></div>
+    <div class="page-head">
+      <div><h1>Notifications</h1><div class="sub">${list.length ? unreadCountNow + ' unread · ' + list.length + ' total' : ''}</div></div>
+      ${unreadCountNow > 0 ? `<button class="btn btn-outline btn-sm" data-action="mark-all-read">Mark all read</button>` : ''}
+    </div>
+    ${list.length ? `<div class="card">${list.slice(0, 100).map((n) => `
+      <div class="notif-item ${n.read ? '' : 'unread'}">
+        <div class="n-icon" style="${n.read ? 'opacity:.6;' : ''}">${ICONS[n.icon] || ICONS.bell}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="n-title" style="${n.read ? '' : 'font-weight:800;'}">${escapeHtml(n.title)}</div>
+          <p class="text-sm text-muted" style="margin:3px 0 0;line-height:1.4;">${escapeHtml(n.body)}</p>
+          <div class="n-time">${timeAgo(n.time)}</div>
+        </div>
+        ${n.read ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:var(--color-primary);flex-shrink:0;margin-top:6px;"></span>'}
       </div>`).join('')}</div>` : emptyState('bell', 'No notifications yet', 'Updates about your orders will appear here.', null)}
   `;
 }
@@ -3853,6 +3871,14 @@ function handleAction(el, ev) {
     case 'open-order-summary': openOrderSummary(el.dataset.orderId); break;
     case 'open-order-chat': openOrderChat(el.dataset.orderId); break;
     case 'chat-set-channel': setChatChannel(el.dataset.channel); break;
+    case 'mark-all-read': {
+      const refId = state.role === 'customer' ? state.currentCustomerId : state.role === 'business' ? state.currentBusinessId : state.role === 'agent' ? state.currentAgentId : null;
+      DynastyllRead(state.role, refId).then(() => {
+        toast('All marked as read', 'success');
+        render();
+      });
+      break;
+    }
     case 'chat-claim-order': {
       const id = el.dataset.orderId;
       const order = getOrder(id);
