@@ -1357,6 +1357,7 @@ function customerOrderTracking(orderId) {
       <button class="btn btn-outline btn-block" data-action="nav" data-view="customer-order-detail" data-order-id="${order.id}">Order details</button>
       ${orderChatButton(order.id, 'Chat with business')}
     </div>
+    <button class="btn btn-ghost btn-block mt-8" data-action="contact-support" data-order-id="${order.id}">Contact support</button>
   `;
 }
 
@@ -1420,6 +1421,7 @@ function customerOrderDetail(orderId) {
       ${!['delivered', 'cancelled'].includes(order.status) ? `<button class="btn btn-primary btn-block" data-action="nav" data-view="order-tracking" data-order-id="${order.id}">Track order</button>` : `<button class="btn btn-accent btn-block" data-action="reorder" data-order-id="${order.id}">Reorder</button>`}
     </div>
     <div class="mt-12">${orderChatButton(order.id, 'Chat about this order')}</div>
+    <button class="btn btn-ghost btn-block mt-8" data-action="contact-support" data-order-id="${order.id}">Contact support</button>
   `;
 }
 
