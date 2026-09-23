@@ -2242,12 +2242,21 @@ function agentEarnings(agent) {
 function agentHistory(agent) {
   const all = getOrders({ agentId: agent.id });
   return `
-    <div class="page-head"><h1>Delivery history</h1></div>
-    ${all.length ? `<div class="row-cards">${all.map((o) => `<div class="row-card">
-      <div class="row-card-top"><span class="row-card-title">${o.orderNumber}</span>${orderStatusBadge(o.status)}</div>
-      <div class="row-card-sub">${escapeHtml((getBusiness(o.businessId) || {}).name || '')} → ${escapeHtml(o.deliveryAddress).slice(0, 34)}...</div>
-      <div class="row-card-sub">${formatDate(o.createdAt)} · Earning: ${formatNaira(o.financial.agentPayment)}</div>
-    </div>`).join('')}</div>` : emptyState('orders', 'No delivery history yet', 'Your completed deliveries will show up here.', null)}
+    <div class="page-head"><h1>Delivery history</h1><div class="sub">${all.length} order${all.length === 1 ? '' : 's'}</div></div>
+    ${all.length ? `<div class="row-cards">${all.map((o) => {
+      const b = getBusiness(o.businessId) || {};
+      return `<div class="row-card pressable" style="cursor:pointer;" data-action="open-order-summary" data-order-id="${o.id}">
+        <div class="row-card-top">
+          <span class="row-card-title">${o.orderNumber}</span>
+          ${orderStatusBadge(o.status)}
+        </div>
+        <div class="row-card-sub">${escapeHtml(b.name || '')} → ${escapeHtml(o.deliveryAddress).slice(0, 34)}...</div>
+        <div class="row-card-sub">${formatDate(o.createdAt)} · Earning: <strong style="color:var(--color-success);">+${formatNaira(o.financial.agentPayment)}</strong></div>
+        <div class="row-card-actions">
+          <span class="link-btn">View details ${ICONS.chevronRight}</span>
+        </div>
+      </div>`;
+    }).join('')}</div>` : emptyState('orders', 'No delivery history yet', 'Your completed deliveries will show up here.', null)}
   `;
 }
 
@@ -3186,6 +3195,78 @@ function setChatChannel(channel) {
   if (input) input.focus();
 }
 
+function openOrderSummary(orderId) {
+  const o = getOrder(orderId);
+  if (!o) { toast('Order not found', 'error'); return; }
+  const biz = getBusiness(o.businessId) || { name: 'Business', address: '', phone: '' };
+  const cust = getCustomer(o.customerId) || { name: 'Customer', phone: '' };
+  const agent = o.agentId ? getAgent(o.agentId) : null;
+  const itemsHtml = (o.items || []).map((it) => `
+    <div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>
+  `).join('');
+  const history = (o.statusHistory || []).map((h, i, arr) => `
+    <div class="timeline-step done">
+      <div class="rail"><div class="node">${ICONS.check}</div>${i < arr.length - 1 ? '<div class="line"></div>' : ''}</div>
+      <div class="content">
+        <div class="t-title">${escapeHtml(ORDER_FLOW_LABEL[h.status] || (h.status || '').replace(/_/g, ' '))}</div>
+        <div class="t-time">${formatDate(h.time)}${h.note ? ' · ' + escapeHtml(h.note) : ''}</div>
+      </div>
+    </div>
+  `).join('');
+
+  openModal(`
+    <div class="modal-head">
+      <div>
+        <h3>${escapeHtml(o.orderNumber)}</h3>
+        <div class="text-sm text-muted" style="margin-top:2px;">${escapeHtml(biz.name)}</div>
+      </div>
+      <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
+    </div>
+
+    <div class="flex items-center gap-8" style="margin-bottom:10px;">
+      ${orderStatusBadge(o.status)}
+      <span class="text-sm text-muted">${formatDate(o.createdAt)}</span>
+    </div>
+
+    <div class="card" style="background:var(--color-bg);border:none;padding:14px;">
+      <strong style="font-size:13px;">Items</strong>
+      <div class="mt-8">${itemsHtml}</div>
+      <hr class="divider" />
+      <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(o.subtotal)}</span></div>
+      <div class="summary-row"><span>Delivery fee</span><span class="val">${formatNaira(o.deliveryFee)}</span></div>
+      <div class="summary-row"><span>Platform fee</span><span class="val">${formatNaira(o.platformFee)}</span></div>
+      <div class="summary-row total" style="font-size:14px;"><span>Customer paid</span><span>${formatNaira(o.total)}</span></div>
+    </div>
+
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Parties</strong>
+      <div class="summary-row mt-8"><span>Business</span><span class="val">${escapeHtml(biz.name)}</span></div>
+      ${biz.phone ? `<div class="summary-row"><span>Business phone</span><span class="val">${escapeHtml(biz.phone)}</span></div>` : ''}
+      <div class="summary-row"><span>Customer</span><span class="val">${escapeHtml(cust.name)}</span></div>
+      ${cust.phone ? `<div class="summary-row"><span>Customer phone</span><span class="val">${escapeHtml(cust.phone)}</span></div>` : ''}
+      ${agent ? `<div class="summary-row"><span>Delivery agent</span><span class="val">${escapeHtml(agent.name)}</span></div>` : `<div class="summary-row"><span>Delivery agent</span><span class="val">Not assigned</span></div>`}
+      <div class="summary-row"><span>Drop-off</span><span class="val" style="max-width:60%;text-align:right;">${escapeHtml(o.deliveryAddress)}</span></div>
+    </div>
+
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Earnings breakdown</strong>
+      <div class="summary-row mt-8"><span>Business receives</span><span class="val">${formatNaira(o.financial.businessReceives)}</span></div>
+      <div class="summary-row"><span>Agent earns</span><span class="val">${formatNaira(o.financial.agentPayment)}</span></div>
+      <div class="summary-row"><span>Platform earns</span><span class="val">${formatNaira(o.financial.platformGrossRevenue)}</span></div>
+    </div>
+
+    ${history ? `
+      <div class="card mt-12">
+        <strong style="font-size:13px;">Timeline</strong>
+        <div class="timeline mt-12">${history}</div>
+      </div>` : ''}
+
+    <button class="btn btn-outline btn-block mt-12" data-action="open-order-chat" data-order-id="${o.id}">
+      ${ICONS.bell2} Open order chat
+    </button>
+  `);
+}
+
 function orderChatButton(orderId, label) {
   return `<button class="btn btn-outline btn-block" data-action="open-order-chat" data-order-id="${orderId}">${ICONS.bell2 || ''} ${escapeHtml(label || 'Message')}</button>`;
 }
@@ -3681,6 +3762,7 @@ function handleAction(el, ev) {
       });
       break;
     }
+    case 'open-order-summary': openOrderSummary(el.dataset.orderId); break;
     case 'open-order-chat': openOrderChat(el.dataset.orderId); break;
     case 'chat-set-channel': setChatChannel(el.dataset.channel); break;
     case 'address-open': openAddressModal(el.dataset.id || null); break;
