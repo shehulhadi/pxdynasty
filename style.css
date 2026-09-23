@@ -1170,3 +1170,79 @@ textarea { resize: vertical; min-height: 80px; }
   margin-right: 4px;
   vertical-align: middle;
 }
+
+/* ==========================================================================
+   BUSINESS PROFILE — banner, logo, tags on storefront + editor
+   ========================================================================== */
+
+/* View (customer storefront) */
+.store-banner-view {
+  height: 150px;
+  background-color: var(--color-surface-alt);
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+.store-banner-fallback {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.store-logo-view {
+  width: 68px;
+  height: 68px;
+  border-radius: 16px;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  border: 3px solid #fff;
+  box-shadow: 0 6px 18px -8px rgba(0,0,0,0.35);
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+/* Editor */
+.store-banner-edit {
+  height: 150px;
+  background-color: var(--color-surface-alt);
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  cursor: pointer;
+}
+.store-banner-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-faint);
+  font-size: 13px;
+  font-weight: 600;
+}
+.store-logo-edit {
+  width: 68px;
+  height: 68px;
+  border-radius: 16px;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  border: 3px solid #fff;
+  box-shadow: 0 6px 18px -8px rgba(0,0,0,0.35);
+  flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
+  background-size: cover;
+  background-position: center;
+}

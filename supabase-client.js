@@ -46,6 +46,13 @@ function sbcRowToBiz(r) {
     bankAccountNumber: r.bank_account_number || null,
     bankAccountName: r.bank_account_name || null,
     subaccountCode: r.subaccount_code || null,
+    bannerUrl: r.banner_url || null,
+    logoUrl: r.logo_url || null,
+    description: r.description || null,
+    openHours: r.open_hours || null,
+    deliveryNote: r.delivery_note || null,
+    whatsapp: r.whatsapp || null,
+    tags: r.tags || [],
     createdAt: r.created_at,
   };
 }
@@ -151,6 +158,13 @@ function sbcBizToRow(b) {
     bank_account_number: b.bankAccountNumber || null,
     bank_account_name: b.bankAccountName || null,
     subaccount_code: b.subaccountCode || null,
+    banner_url: b.bannerUrl || null,
+    logo_url: b.logoUrl || null,
+    description: b.description || null,
+    open_hours: b.openHours || null,
+    delivery_note: b.deliveryNote || null,
+    whatsapp: b.whatsapp || null,
+    tags: b.tags || [],
   };
 }
 function sbcProductToRow(p) {
@@ -513,6 +527,23 @@ async function sbcInsertPayout(p) {
   return { ok: true };
 }
 
+/* Upload an image to the product-images bucket (shared for banners/logos too). */
+async function sbcUploadImage(file, prefix) {
+  const c = sbcInit();
+  if (!c) return { ok: false, error: 'no client' };
+  if (!file) return { ok: false, error: 'no file' };
+  const ext = (file.name && file.name.split('.').pop()) || 'jpg';
+  const path = `${prefix || 'img'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  try {
+    const { error } = await c.storage.from('product-images').upload(path, file, {
+      cacheControl: '3600', upsert: false, contentType: file.type || 'image/jpeg',
+    });
+    if (error) { console.error('upload', error); return { ok: false, error: error.message }; }
+    const { data } = c.storage.from('product-images').getPublicUrl(path);
+    return { ok: true, url: data.publicUrl };
+  } catch (e) { return { ok: false, error: String(e) }; }
+}
+
 /* Expose globally for app.js to call. */
 window.PXDynastySBC = {
   init: sbcInit,
@@ -535,4 +566,5 @@ window.PXDynastySBC = {
   fetchCounts: sbcFetchCounts,
   fetchPayouts: sbcFetchPayouts,
   insertPayout: sbcInsertPayout,
+  uploadImage: sbcUploadImage,
 };

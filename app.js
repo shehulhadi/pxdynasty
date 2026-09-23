@@ -1060,6 +1060,11 @@ function customerProductDetail(id) {
         </div>
       </div>
     </div>
+    <div class="flex gap-8 mt-12">
+      <button class="btn btn-outline" data-action="share-product" data-id="${p.id}" style="flex:0 0 auto;">${ICONS.share || ''} Share</button>
+      <button class="btn btn-outline" data-action="nav" data-view="business" data-id="${biz.id}" style="flex:1;">Visit ${escapeHtml(biz.name)}</button>
+    </div>
+
     <div class="sticky-bottom-bar">
       <button class="btn btn-outline btn-block" ${outOfStock ? 'disabled' : ''} data-action="add-to-cart" data-id="${p.id}" data-qty="${qty}">Add to cart</button>
       <button class="btn btn-primary btn-block" ${outOfStock ? 'disabled' : ''} data-action="buy-now" data-id="${p.id}" data-qty="${qty}">Buy now</button>
@@ -1071,25 +1076,49 @@ function customerBusinessStore(id) {
   const b = getBusiness(id);
   if (!b) return emptyState('store', 'Business not found', '', null);
   const products = getProducts({ businessId: id });
+  const tags = Array.isArray(b.tags) ? b.tags.filter(Boolean) : [];
+  const waHref = b.whatsapp ? 'https://wa.me/' + b.whatsapp.replace(/\D/g, '') : null;
+
   return `
     ${backBtn('Back')}
-    <div class="card card-flush">
-      <div style="height:120px;">${placeholderThumb((b.hue + 40) % 360, categoryEmoji(b.category))}</div>
+
+    <div class="card card-flush" style="overflow:hidden;">
+      <div class="store-banner-view" ${b.bannerUrl ? `style="background-image:url('${escapeHtml(b.bannerUrl)}');"` : ''}>
+        ${b.bannerUrl ? '' : `<div class="store-banner-fallback">${placeholderThumb((b.hue + 40) % 360, categoryEmoji(b.category))}</div>`}
+      </div>
       <div style="padding:16px;">
-        <div class="flex items-center gap-8">
-          <div class="logo-sq" style="width:52px;height:52px;">${initials(b.name)}</div>
-          <div>
-            <div class="flex items-center gap-6"><h2 style="font-size:18px;">${escapeHtml(b.name)}</h2>${b.verified ? `<span class="verified-badge">${ICONS.verified}</span>` : ''}</div>
-            <div class="rating-row">${ICONS.star} ${b.rating} <span class="text-faint">· ${(CATEGORIES.find((c) => c.id === b.category) || {}).name || ''}</span></div>
+        <div class="flex items-end gap-12" style="margin-top:-38px;">
+          <div class="store-logo-view" ${b.logoUrl ? `style="background-image:url('${escapeHtml(b.logoUrl)}');background-size:cover;"` : ''}>
+            ${b.logoUrl ? '' : escapeHtml(initials(b.name))}
+          </div>
+          <div style="padding-bottom:6px;">
+            <div class="flex items-center gap-6"><h2 style="font-size:18px;margin:0;">${escapeHtml(b.name)}</h2>${b.verified ? `<span class="verified-badge">${ICONS.verified}</span>` : ''}</div>
+            <div class="rating-row">${ICONS.star} ${b.rating || '—'} <span class="text-faint">· ${(CATEGORIES.find((c) => c.id === b.category) || {}).name || ''}</span></div>
           </div>
         </div>
+
+        ${b.description ? `<p class="text-muted" style="font-size:13.5px;margin:14px 0 0;line-height:1.55;">${escapeHtml(b.description)}</p>` : ''}
+
+        ${tags.length ? `<div class="flex gap-6 mt-12" style="flex-wrap:wrap;">${tags.map((t) => `<span class="chip">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+
         <div class="flex gap-8 mt-12" style="flex-wrap:wrap;">
           <span class="status-badge ${b.open ? 'status-success' : 'status-neutral'}">${b.open ? 'Open now' : 'Closed'}</span>
-          <span class="chip">${ICONS.location} ${escapeHtml(b.address)}</span>
-          <span class="chip">${ICONS.clock} ${b.deliveryEstimate} min delivery</span>
+          ${b.openHours ? `<span class="chip">${ICONS.clock} ${escapeHtml(b.openHours)}</span>` : ''}
+          <span class="chip">${ICONS.clock} ${b.deliveryEstimate || 30} min delivery</span>
+        </div>
+
+        ${b.address || b.deliveryNote ? `<div class="text-sm text-muted mt-12" style="line-height:1.5;">
+          ${b.address ? `${ICONS.location} ${escapeHtml(b.address)}<br/>` : ''}
+          ${b.deliveryNote ? escapeHtml(b.deliveryNote) : ''}
+        </div>` : ''}
+
+        <div class="flex gap-8 mt-12" style="flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" data-action="share-business" data-id="${b.id}">${ICONS.share || ''} Share shop</button>
+          ${waHref ? `<a class="btn btn-outline btn-sm" href="${escapeHtml(waHref)}" target="_blank" rel="noopener">${ICONS.phone} WhatsApp</a>` : ''}
         </div>
       </div>
     </div>
+
     <div class="section-title-row"><h2>Products (${products.length})</h2></div>
     ${products.length ? `<div class="product-grid">${products.map(productCardHtml).join('')}</div>` : emptyState('box', 'No products yet', 'This business has not listed any products.', null)}
   `;
@@ -1401,6 +1430,7 @@ function customerOrderTracking(orderId) {
       ${orderChatButton(order.id, 'Chat with business')}
     </div>
     <button class="btn btn-ghost btn-block mt-8" data-action="contact-support" data-order-id="${order.id}">Contact support</button>
+    <button class="btn btn-ghost btn-block mt-8" data-action="share-order" data-order-id="${order.id}">Share tracking details</button>
   `;
 }
 
@@ -2006,20 +2036,92 @@ function businessAnalytics(biz) {
 
 function businessStoreProfile(biz) {
   return `
-    <div class="page-head"><h1>Store profile</h1></div>
-    <div class="card">
-      <div class="form-group"><label>Store name</label><input type="text" value="${escapeHtml(biz.name)}" /></div>
-      <div class="form-group"><label>Owner</label><input type="text" value="${escapeHtml(biz.ownerName || '')}" /></div>
-      <div class="form-row"><div class="form-group"><label>Phone</label><input type="text" value="${escapeHtml(biz.phone || '')}" /></div><div class="form-group"><label>Email</label><input type="email" value="${escapeHtml(biz.email || '')}" /></div></div>
-      <div class="form-group"><label>Address</label><input type="text" value="${escapeHtml(biz.address || '')}" /></div>
-      <div class="form-group mb-0 flex items-center justify-between" style="flex-direction:row;">
-        <label class="mb-0">Store is currently accepting orders</label>
-        <input type="checkbox" ${biz.open ? 'checked' : ''} style="width:20px;height:20px;" data-action="toggle-store-open" />
+    <div class="page-head">
+      <div><h1>Store profile</h1><div class="sub">How customers see your shop</div></div>
+      <button class="btn btn-outline btn-sm" data-action="share-business" data-id="${biz.id}">${ICONS.share || ''} Preview &amp; share</button>
+    </div>
+
+    <!-- Banner + logo -->
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="store-banner-edit" style="${biz.bannerUrl ? `background-image:url('${escapeHtml(biz.bannerUrl)}');` : ''}">
+        ${biz.bannerUrl ? '' : '<div class="store-banner-empty">Tap to add a cover photo</div>'}
+        <input type="file" id="biz-banner-input" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+      </div>
+      <div style="padding:16px;">
+        <div class="flex items-center gap-12" style="margin-top:-38px;">
+          <div class="store-logo-edit" style="${biz.logoUrl ? `background-image:url('${escapeHtml(biz.logoUrl)}');background-size:cover;` : ''}">
+            ${biz.logoUrl ? '' : escapeHtml(initials(biz.name))}
+            <input type="file" id="biz-logo-input" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+          </div>
+          <div class="text-sm text-faint" id="biz-upload-status" style="margin-top:34px;">Tap cover or logo to change</div>
+        </div>
+        <div class="form-group mt-12"><label>Store name</label><input type="text" id="bs-name" value="${escapeHtml(biz.name)}" /></div>
+        <div class="form-group"><label>Short description</label><textarea id="bs-description" placeholder="One or two lines about what you sell" style="min-height:70px;">${escapeHtml(biz.description || '')}</textarea></div>
+        <div class="form-group"><label>Tags</label><input type="text" id="bs-tags" placeholder="e.g. poultry, eggs, frozen chicken" value="${escapeHtml((biz.tags || []).join(', '))}" /></div>
+        <p class="text-sm text-faint" style="margin-top:-6px;">Separate tags with commas — customers see them as chips.</p>
       </div>
     </div>
-    <button class="btn btn-primary btn-block mt-16" data-action="toast-success" data-msg="Store profile updated">Save changes</button>
+
+    <!-- Contact + hours -->
+    <div class="card mt-12">
+      <strong style="font-size:13px;">Contact &amp; opening</strong>
+      <div class="form-row mt-12">
+        <div class="form-group"><label>Phone</label><input type="text" id="bs-phone" value="${escapeHtml(biz.phone || '')}" /></div>
+        <div class="form-group"><label>WhatsApp</label><input type="tel" id="bs-whatsapp" value="${escapeHtml(biz.whatsapp || '')}" placeholder="080…" /></div>
+      </div>
+      <div class="form-group"><label>Email</label><input type="email" id="bs-email" value="${escapeHtml(biz.email || '')}" /></div>
+      <div class="form-group"><label>Address</label><input type="text" id="bs-address" value="${escapeHtml(biz.address || '')}" /></div>
+      <div class="form-group"><label>Opening hours</label><input type="text" id="bs-openHours" value="${escapeHtml(biz.openHours || '')}" placeholder="e.g. Mon–Sat · 8am – 8pm" /></div>
+      <div class="form-group mb-0"><label>Delivery note</label><input type="text" id="bs-deliveryNote" value="${escapeHtml(biz.deliveryNote || '')}" placeholder="e.g. Same-day delivery within Yola" /></div>
+    </div>
+
+    <!-- Open toggle -->
+    <div class="card mt-12">
+      <div class="flex items-center justify-between">
+        <div>
+          <strong style="font-size:14px;">Currently accepting orders</strong>
+          <p class="text-sm text-muted mt-8" style="margin-bottom:0;">Turn off when you're closed or overwhelmed.</p>
+        </div>
+        <input type="checkbox" id="bs-open" ${biz.open ? 'checked' : ''} style="width:22px;height:22px;" />
+      </div>
+    </div>
+
+    <div class="auth-error" id="bs-error" style="margin-top:12px;"></div>
+    <button class="btn btn-primary btn-block mt-16" data-action="biz-save-profile" data-id="${biz.id}">Save changes</button>
   `;
 }
+
+/* Wait for the banner/logo file inputs on the store profile page. */
+document.addEventListener('change', async (e) => {
+  if (!e.target || (e.target.id !== 'biz-banner-input' && e.target.id !== 'biz-logo-input')) return;
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const biz = getBusiness(state.currentBusinessId);
+  if (!biz) return;
+  const status = document.getElementById('biz-upload-status');
+  if (status) status.textContent = 'Uploading…';
+  const sbcMod = window.PXDynastySBC;
+  if (!sbcMod || !sbcMod.uploadImage) {
+    if (status) status.textContent = 'Upload not available.';
+    return;
+  }
+  const prefix = e.target.id === 'biz-banner-input' ? 'banner' : 'logo';
+  const res = await sbcMod.uploadImage(file, prefix);
+  if (!res.ok) {
+    if (status) status.textContent = 'Upload failed: ' + (res.error || 'unknown');
+    toast('Upload failed', 'error');
+    return;
+  }
+  if (prefix === 'banner') biz.bannerUrl = res.url;
+  else biz.logoUrl = res.url;
+  saveDataLocalOnly();
+  if (window.PXDynastySBC && window.PXDynastySBC.upsertBusiness) {
+    window.PXDynastySBC.upsertBusiness(biz).catch(() => {});
+  }
+  if (status) status.textContent = 'Uploaded ✓';
+  toast('Image uploaded', 'success');
+  render();
+});
 
 function businessSettings(biz) {
   return `
@@ -4111,6 +4213,68 @@ function adminSupportOpenCount() {
 }
 
 /* ==========================================================================
+   SHARE — native share sheet with clipboard fallback
+   ========================================================================== */
+
+async function shareNative(data) {
+  const payload = {
+    title: data.title || 'PXDynasty',
+    text: data.text || '',
+    url: data.url || location.origin + location.pathname,
+  };
+  if (navigator.share) {
+    try { await navigator.share(payload); return true; }
+    catch (e) {
+      if (e && e.name === 'AbortError') return false;
+      // Fall through to clipboard.
+    }
+  }
+  try {
+    await navigator.clipboard.writeText((payload.text ? payload.text + '\n' : '') + payload.url);
+    toast('Link copied to clipboard', 'success');
+  } catch (_) {
+    prompt('Copy this link:', payload.url);
+  }
+  return true;
+}
+
+function shareProduct(productId) {
+  const prod = getProduct(productId);
+  if (!prod) return;
+  const biz = getBusiness(prod.businessId) || {};
+  const price = prod.discountPrice || prod.price;
+  const url = location.origin + location.pathname + '#product=' + prod.id;
+  shareNative({
+    title: prod.name + ' · ' + biz.name,
+    text: `${prod.name} — ${formatNaira(price)} from ${biz.name} on PXDynasty`,
+    url,
+  });
+}
+
+function shareBusiness(businessId) {
+  const biz = getBusiness(businessId);
+  if (!biz) return;
+  const url = location.origin + location.pathname + '#business=' + biz.id;
+  shareNative({
+    title: biz.name + ' on PXDynasty',
+    text: `Check out ${biz.name} on PXDynasty${biz.description ? ' — ' + biz.description.slice(0, 80) : ''}`,
+    url,
+  });
+}
+
+function shareOrderTracking(orderId) {
+  const order = getOrder(orderId);
+  if (!order) return;
+  const biz = getBusiness(order.businessId) || {};
+  const url = location.origin + location.pathname;
+  shareNative({
+    title: 'Order ' + order.orderNumber,
+    text: `Order ${order.orderNumber} from ${biz.name} — status: ${order.status.replace(/_/g, ' ')}`,
+    url,
+  });
+}
+
+/* ==========================================================================
    14. EVENT DELEGATION
    ========================================================================== */
 
@@ -4617,6 +4781,32 @@ function handleAction(el, ev) {
     case 'open-order-summary': openOrderSummary(el.dataset.orderId); break;
     case 'open-order-chat': openOrderChat(el.dataset.orderId); break;
     case 'chat-set-channel': setChatChannel(el.dataset.channel); break;
+    case 'share-product': shareProduct(el.dataset.id); break;
+    case 'biz-save-profile': {
+      const biz = getBusiness(state.currentBusinessId);
+      if (!biz) break;
+      const g = (id) => (document.getElementById(id) || {}).value;
+      biz.name = (g('bs-name') || biz.name).trim();
+      biz.description = g('bs-description') || '';
+      biz.tags = (g('bs-tags') || '').split(',').map((s) => s.trim()).filter(Boolean);
+      biz.phone = g('bs-phone') || biz.phone;
+      biz.whatsapp = g('bs-whatsapp') || null;
+      biz.email = g('bs-email') || biz.email;
+      biz.address = g('bs-address') || biz.address;
+      biz.openHours = g('bs-openHours') || null;
+      biz.deliveryNote = g('bs-deliveryNote') || null;
+      const openEl = document.getElementById('bs-open');
+      biz.open = openEl ? !!openEl.checked : biz.open;
+      saveDataLocalOnly();
+      if (window.PXDynastySBC && window.PXDynastySBC.upsertBusiness) {
+        window.PXDynastySBC.upsertBusiness(biz).catch((e) => console.error(e));
+      }
+      toast('Store profile updated', 'success');
+      render();
+      break;
+    }
+    case 'share-business': shareBusiness(el.dataset.id); break;
+    case 'share-order': shareOrderTracking(el.dataset.orderId); break;
     case 'open-notification': {
       const id = el.dataset.id;
       // Close the notifications page context if we're there.
