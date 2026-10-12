@@ -1337,7 +1337,7 @@ function customerOrderSuccess(orderId) {
       <div class="summary-row"><span>Business</span><span class="val">${escapeHtml(biz.name)}</span></div>
       <hr class="divider" />
       <strong style="font-size:13px;">Items</strong>
-      <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
+      <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
     </div>
     <div class="flex gap-10 mt-16">
       <button class="btn btn-outline btn-block" data-action="nav" data-view="explore">Continue shopping</button>
@@ -1395,7 +1395,7 @@ function customerOrderTracking(orderId) {
     <div class="card mt-12">
       <strong style="font-size:13px;">Items</strong>
       <div class="mt-8">
-        ${order.items.map((it) => `<div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}
+        ${order.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}
       </div>
       <hr class="divider" />
       <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(order.subtotal)}</span></div>
@@ -1481,7 +1481,7 @@ function customerOrderDetail(orderId) {
     <button class="btn btn-ghost btn-sm" data-action="open-order-summary" data-order-id="${order.id}" style="margin-bottom:8px;">View full summary ${ICONS.chevronRight}</button>
     <div class="card">
       <strong style="font-size:13px;">Items</strong>
-      <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
+      <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
       <hr class="divider" />
       <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(order.subtotal)}</span></div>
       <div class="summary-row"><span>Delivery &amp; service</span><span class="val">${formatNaira(order.deliveryFee + order.platformFee)}</span></div>
@@ -1852,7 +1852,7 @@ function businessOrderDetail(orderId) {
     <div class="grid-2">
       <div>
         <div class="card"><strong style="font-size:13px;">Items</strong>
-          <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
+          <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
           <hr class="divider" />
           <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(order.subtotal)}</span></div>
         </div>
@@ -2824,7 +2824,7 @@ function adminOrderDetail(orderId) {
           <div class="summary-row"><span>Agent</span><span class="val">${agent ? escapeHtml(agent.name) : 'Not yet assigned'}</span></div>
         </div>
         <div class="card mt-12"><strong style="font-size:13px;">Items</strong>
-          <div class="mt-8">${o.items.map((it) => `<div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
+          <div class="mt-8">${o.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
         </div>
         ${!agent && !['delivered', 'cancelled'].includes(o.status) ? `
         <div class="card mt-12">
@@ -3821,7 +3821,7 @@ function openOrderSummary(orderId) {
   const cust = getCustomer(o.customerId) || { name: 'Customer', phone: '' };
   const agent = o.agentId ? getAgent(o.agentId) : null;
   const itemsHtml = (o.items || []).map((it) => `
-    <div class="summary-row"><span>${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>
+    <div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>
   `).join('');
   const history = (o.statusHistory || []).map((h, i, arr) => `
     <div class="timeline-step done">
@@ -5171,7 +5171,7 @@ async function placeOrderFlow() {
   const drafts = cartTotals.perBusiness.map((g) => buildOrderDraft({
     customerId: state.currentCustomerId,
     businessId: g.businessId,
-    items: g.items.map((l) => ({ productId: l.productId, name: l.product.name, price: l.product.discountPrice || l.product.price, qty: l.qty })),
+    items: g.items.map((l) => ({ productId: l.productId, name: l.product.name, price: l.product.discountPrice || l.product.price, qty: l.qty, imageUrl: l.product.imageUrl || null })),
     deliveryAddress: cd.address,
     deliveryInstructions: cd.instructions,
     customerName: cd.name,
