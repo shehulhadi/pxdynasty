@@ -1192,7 +1192,7 @@ function cartLineHtml(l) {
   </div>`;
 }
 function placeholderThumbInline(p) {
-  return `<div class="thumb-sm" style="width:62px;height:62px;border-radius:10px;overflow:hidden;">${placeholderThumb(p.hue, p.emoji)}</div>`;
+  return `<div class="thumb-sm" style="width:62px;height:62px;border-radius:10px;overflow:hidden;">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;" />` : placeholderThumb(p.hue, p.emoji)}</div>`;
 }
 
 function savedForLaterHtml() {
