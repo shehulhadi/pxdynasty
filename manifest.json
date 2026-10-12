@@ -4,8 +4,8 @@
   "description": "PXDynasty is a multi-vendor local marketplace with platform-managed delivery.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#111111",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0B6E4F",
   "icons": [
     {
       "src": "icon-192.png",

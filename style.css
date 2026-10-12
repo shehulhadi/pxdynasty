@@ -1246,3 +1246,61 @@ textarea { resize: vertical; min-height: 80px; }
   background-size: cover;
   background-position: center;
 }
+
+/* Install banner (Add to Home Screen) */
+.px-a2hs {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 9999;
+  transform: translateY(140%);
+  transition: transform 0.3s ease;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.px-a2hs-show { transform: translateY(0); }
+.px-a2hs-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.px-a2hs-body { flex: 1; min-width: 0; }
+.px-a2hs-title { font-weight: 800; font-size: 14px; color: var(--color-text); line-height: 1.2; }
+.px-a2hs-sub { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; line-height: 1.35; }
+.px-a2hs-actions { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.px-a2hs-cta {
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.px-a2hs-skip {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+@media (max-width: 380px) {
+  .px-a2hs { padding: 10px; gap: 8px; }
+  .px-a2hs-icon { width: 36px; height: 36px; }
+  .px-a2hs-title { font-size: 13px; }
+  .px-a2hs-sub { font-size: 11px; }
+  .px-a2hs-cta { padding: 6px 10px; font-size: 12px; }
+}

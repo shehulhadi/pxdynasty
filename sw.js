@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pxdynasty-v1';
+const CACHE_NAME = 'pxdynasty-v3';
 const ASSETS = [
   './index.html',
   './style.css',
@@ -6,6 +6,7 @@ const ASSETS = [
   './auth.js',
   './supabase-client.js',
   './paystack.js',
+  './install.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'
@@ -32,11 +33,18 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // Only handle GET requests from same origin
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
   event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request).catch(() => {
-        // Fallback for offline if needed
-      });
-    })
+    fetch(event.request)
+      .then(response => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request).then(r => r || caches.match('./index.html')))
   );
 });
