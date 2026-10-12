@@ -767,7 +767,7 @@ function openMoreMenu() {
   const itemsHtml = nav.map((n) => `
     <button class="row-card pressable" style="display:block;width:100%;text-align:left;cursor:pointer;margin-bottom:8px;border:1px solid var(--color-border);"
       data-action="more-nav" data-view="${n.id}">
-      <div class="flex items-center gap-10" style="padding:2px 4px;">
+      <div class="flex items-center gap-10" style="padding:4px 4px;">
         ${ICONS[n.icon]}
         <span style="font-weight:600;font-size:14px;">${n.label}</span>
       </div>
@@ -927,10 +927,10 @@ function customerHome() {
     : `Set your <strong style="color:var(--color-text)">delivery address</strong>`;
 
   return `
-    <div class="flex items-center gap-6 text-sm text-muted mb-0" style="margin-bottom:10px;">
+    <div class="flex items-center gap-6 text-sm text-muted mb-0" style="margin-bottom:12px;">
       ${ICONS.location} <span>${locationLine}</span>
     </div>
-    <div class="header-search" style="display:block;max-width:none;margin-bottom:14px;">
+    <div class="header-search" style="display:block;max-width:none;margin-bottom:16px;">
       <input type="text" placeholder="Search products, businesses, categories" id="home-search-input" />
     </div>
 
@@ -1033,22 +1033,22 @@ function customerProductDetail(id) {
           : placeholderThumb(p.hue, p.emoji, true)}
       </div></div>
       <div>
-        <div class="flex items-center gap-6" style="margin-top:14px;">
+        <div class="flex items-center gap-6" style="margin-top:16px;">
           <span class="chip">${(CATEGORIES.find((c) => c.id === p.category) || {}).name || ''}</span>
           ${outOfStock ? `<span class="status-badge status-error">Out of stock</span>` : `<span class="status-badge status-success">In stock</span>`}
         </div>
-        <h1 style="font-size:22px;margin-top:10px;">${escapeHtml(p.name)}</h1>
+        <h1 style="font-size:22px;margin-top:12px;">${escapeHtml(p.name)}</h1>
         <div class="flex items-center gap-6 pressable" style="cursor:pointer;" data-action="nav" data-view="business" data-id="${biz.id}">
           <span class="text-muted" style="font-size:13.5px;">${escapeHtml(biz.name)}</span>
         </div>
-        <div class="rating-row" style="margin-top:6px;">${ICONS.star} <strong>${p.rating}</strong> <span class="text-faint">· ${p.sales || 0} sold · ${p.stock} left</span></div>
-        <div class="price-row" style="margin-top:10px;">
+        <div class="rating-row" style="margin-top:8px;">${ICONS.star} <strong>${p.rating}</strong> <span class="text-faint">· ${p.sales || 0} sold · ${p.stock} left</span></div>
+        <div class="price-row" style="margin-top:12px;">
           <span class="now" style="font-size:24px;">${formatNaira(price)}</span>
           ${p.discountPrice ? `<span class="was" style="font-size:15px;">${formatNaira(p.price)}</span>` : ''}
         </div>
         <hr class="divider" />
         <p class="text-muted" style="font-size:14px;">${escapeHtml(p.description)}</p>
-        <div class="form-group" style="margin-top:14px;"><label>Specifications</label>
+        <div class="form-group" style="margin-top:16px;"><label>Specifications</label>
           <div class="text-sm text-muted">SKU: ${escapeHtml(p.sku)}</div>
         </div>
         <div class="form-group"><label>Quantity</label>
@@ -1091,13 +1091,13 @@ function customerBusinessStore(id) {
           <div class="store-logo-view" ${b.logoUrl ? `style="background-image:url('${escapeHtml(b.logoUrl)}');background-size:cover;"` : ''}>
             ${b.logoUrl ? '' : escapeHtml(initials(b.name))}
           </div>
-          <div style="padding-bottom:6px;">
+          <div style="padding-bottom:8px;">
             <div class="flex items-center gap-6"><h2 style="font-size:18px;margin:0;">${escapeHtml(b.name)}</h2>${b.verified ? `<span class="verified-badge">${ICONS.verified}</span>` : ''}</div>
             <div class="rating-row">${ICONS.star} ${b.rating || '—'} <span class="text-faint">· ${(CATEGORIES.find((c) => c.id === b.category) || {}).name || ''}</span></div>
           </div>
         </div>
 
-        ${b.description ? `<p class="text-muted" style="font-size:13.5px;margin:14px 0 0;line-height:1.55;">${escapeHtml(b.description)}</p>` : ''}
+        ${b.description ? `<p class="text-muted" style="font-size:13.5px;margin:16px 0 0;line-height:1.55;">${escapeHtml(b.description)}</p>` : ''}
 
         ${tags.length ? `<div class="flex gap-6 mt-12" style="flex-wrap:wrap;">${tags.map((t) => `<span class="chip">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
 
@@ -1184,8 +1184,8 @@ function cartLineHtml(l) {
           <button data-action="cart-qty" data-id="${l.product.id}" data-dir="1">+</button>
         </div>
         <div class="flex gap-10">
-          <button class="btn-ghost btn-sm" style="padding:4px 6px;" data-action="save-for-later" data-id="${l.product.id}">Save</button>
-          <button class="btn-ghost btn-sm" style="padding:4px 6px;color:var(--color-error);" data-action="remove-from-cart" data-id="${l.product.id}">Remove</button>
+          <button class="btn-ghost btn-sm" style="padding:4px 8px;" data-action="save-for-later" data-id="${l.product.id}">Save</button>
+          <button class="btn-ghost btn-sm" style="padding:4px 8px;color:var(--color-error);" data-action="remove-from-cart" data-id="${l.product.id}">Remove</button>
         </div>
       </div>
     </div>
@@ -1326,7 +1326,7 @@ function customerOrderSuccess(orderId) {
   if (!order) return emptyState('errorCircle', 'Order not found', '', null);
   const biz = getBusiness(order.businessId) || { name: 'Business', deliveryEstimate: 30 };
   return `
-    <div class="flex-col items-center" style="text-align:center;padding:26px 10px 10px;">
+    <div class="flex-col items-center" style="text-align:center;padding:24px 12px 10px;">
       <div class="icon-wrap icon-wrap-lg" style="background:var(--color-success-tint);color:var(--color-success);">${ICONS.checkCircle}</div>
       <h1 style="margin-top:16px;">Payment successful</h1>
       <p class="text-muted">Your order has been placed and sent to ${escapeHtml(biz.name)}.</p>
@@ -1337,7 +1337,7 @@ function customerOrderSuccess(orderId) {
       <div class="summary-row"><span>Business</span><span class="val">${escapeHtml(biz.name)}</span></div>
       <hr class="divider" />
       <strong style="font-size:13px;">Items</strong>
-      <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
+      <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:8px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
     </div>
     <div class="flex gap-10 mt-16">
       <button class="btn btn-outline btn-block" data-action="nav" data-view="explore">Continue shopping</button>
@@ -1368,7 +1368,7 @@ function customerOrderTracking(orderId) {
     ${awaitingConfirm ? `
       <div class="card" style="border-color:var(--color-accent);background:var(--color-accent-tint);">
         <strong style="color:var(--color-accent-dark);font-size:15px;">Your order is arriving</strong>
-        <p class="text-sm mt-8" style="margin-bottom:14px;color:var(--color-accent-dark);">The delivery agent is on the way. Once they hand over your items, please confirm receipt here.</p>
+        <p class="text-sm mt-8" style="margin-bottom:16px;color:var(--color-accent-dark);">The delivery agent is on the way. Once they hand over your items, please confirm receipt here.</p>
         <div class="flex gap-8">
           <button class="btn btn-primary btn-block" data-action="customer-confirm-delivery" data-order-id="${order.id}">${ICONS.check} I received my order</button>
           <button class="btn btn-outline btn-block" data-action="customer-report-problem" data-order-id="${order.id}">Report a problem</button>
@@ -1376,7 +1376,7 @@ function customerOrderTracking(orderId) {
       </div>
     ` : ''}
 
-    ${!cancelled && !awaitingConfirm ? `<div class="map-placeholder mt-12">${ICONS.location}<span style="margin-left:6px;">Live map preview — agent location updates in real deployment</span></div>` : ''}
+    ${!cancelled && !awaitingConfirm ? `<div class="map-placeholder mt-12">${ICONS.location}<span style="margin-left:8px;">Live map preview — agent location updates in real deployment</span></div>` : ''}
 
     ${agent ? `
       <div class="card mt-12">
@@ -1395,7 +1395,7 @@ function customerOrderTracking(orderId) {
     <div class="card mt-12">
       <strong style="font-size:13px;">Items</strong>
       <div class="mt-8">
-        ${order.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}
+        ${order.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:8px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}
       </div>
       <hr class="divider" />
       <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(order.subtotal)}</span></div>
@@ -1481,7 +1481,7 @@ function customerOrderDetail(orderId) {
     <button class="btn btn-ghost btn-sm" data-action="open-order-summary" data-order-id="${order.id}" style="margin-bottom:8px;">View full summary ${ICONS.chevronRight}</button>
     <div class="card">
       <strong style="font-size:13px;">Items</strong>
-      <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
+      <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:8px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
       <hr class="divider" />
       <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(order.subtotal)}</span></div>
       <div class="summary-row"><span>Delivery &amp; service</span><span class="val">${formatNaira(order.deliveryFee + order.platformFee)}</span></div>
@@ -1518,7 +1518,7 @@ function customerProfile() {
     </div>
     <div class="card mt-12" style="padding:0;">
       ${rows.map(([view, label, icon, meta]) => `
-        <div class="flex items-center justify-between pressable" style="padding:14px 16px;border-bottom:1px solid var(--color-border);cursor:pointer;" data-action="nav" data-view="${view}">
+        <div class="flex items-center justify-between pressable" style="padding:16px 16px;border-bottom:1px solid var(--color-border);cursor:pointer;" data-action="nav" data-view="${view}">
           <div class="flex items-center gap-10">${icon}<span style="font-weight:600;font-size:14px;">${label}</span></div>
           <div class="flex items-center gap-6 text-muted text-sm">${meta} ${ICONS.chevronRight}</div>
         </div>`).join('')}
@@ -1534,7 +1534,7 @@ function customerAddresses() {
     ${addrs.length ? `<div class="row-cards">${addrs.map((a) => `
       <div class="row-card">
         <div class="row-card-top">
-          <span class="row-card-title">${escapeHtml(a.label)}${a.isDefault ? ' <span class="status-badge status-success" style="margin-left:6px;">Default</span>' : ''}</span>
+          <span class="row-card-title">${escapeHtml(a.label)}${a.isDefault ? ' <span class="status-badge status-success" style="margin-left:8px;">Default</span>' : ''}</span>
         </div>
         <div class="row-card-sub">${escapeHtml(a.line)}</div>
         ${a.phone ? `<div class="row-card-sub">${escapeHtml(a.phone)}</div>` : ''}
@@ -1663,10 +1663,10 @@ function notificationsView() {
         <div class="n-icon" style="${n.read ? 'opacity:.6;' : ''}">${ICONS[n.icon] || ICONS.bell}</div>
         <div style="flex:1;min-width:0;">
           <div class="n-title" style="${n.read ? '' : 'font-weight:800;'}">${escapeHtml(n.title)}</div>
-          <p class="text-sm text-muted" style="margin:3px 0 0;line-height:1.4;">${escapeHtml(n.body)}</p>
+          <p class="text-sm text-muted" style="margin:4px 0 0;line-height:1.4;">${escapeHtml(n.body)}</p>
           <div class="n-time">${timeAgo(n.time)}</div>
         </div>
-        ${n.read ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:var(--color-primary);flex-shrink:0;margin-top:6px;"></span>'}
+        ${n.read ? '' : '<span style="width:8px;height:8px;border-radius:50%;background:var(--color-primary);flex-shrink:0;margin-top:8px;"></span>'}
       </div>`).join('')}</div>` : emptyState('bell', 'No notifications yet', 'Updates about your orders will appear here.', null)}
   `;
 }
@@ -1828,7 +1828,7 @@ function businessOrderCardHtml(o, withActions) {
     ${(() => {
       const p = chatPreviewFor(o.id);
       if (!p || (!p.count && !p.lastBody)) return '';
-      return `<div class="chat-preview-line" style="margin-top:6px;">${p.count ? `<span class="chat-inline-badge">${p.count}</span> ` : ''}${escapeHtml((p.lastBody || '').slice(0, 70))}${(p.lastBody || '').length > 70 ? '…' : ''}</div>`;
+      return `<div class="chat-preview-line" style="margin-top:8px;">${p.count ? `<span class="chat-inline-badge">${p.count}</span> ` : ''}${escapeHtml((p.lastBody || '').slice(0, 70))}${(p.lastBody || '').length > 70 ? '…' : ''}</div>`;
     })()}
     <div class="row-card-actions">
       <button class="btn btn-outline btn-sm" data-action="nav" data-view="biz-order-detail" data-order-id="${o.id}">View</button>
@@ -1852,7 +1852,7 @@ function businessOrderDetail(orderId) {
     <div class="grid-2">
       <div>
         <div class="card"><strong style="font-size:13px;">Items</strong>
-          <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
+          <div class="mt-8">${order.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:8px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
           <hr class="divider" />
           <div class="summary-row"><span>Subtotal</span><span class="val">${formatNaira(order.subtotal)}</span></div>
         </div>
@@ -2062,7 +2062,7 @@ function businessStoreProfile(biz) {
             ${biz.logoUrl ? '' : escapeHtml(initials(biz.name))}
             <input type="file" id="biz-logo-input" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
           </div>
-          <div class="text-sm text-faint" id="biz-upload-status" style="margin-top:34px;">Tap cover or logo to change</div>
+          <div class="text-sm text-faint" id="biz-upload-status" style="margin-top:32px;">Tap cover or logo to change</div>
         </div>
         <div class="form-group mt-12"><label>Store name</label><input type="text" id="bs-name" value="${escapeHtml(biz.name)}" /></div>
         <div class="form-group"><label>Short description</label><textarea id="bs-description" placeholder="One or two lines about what you sell" style="min-height:70px;">${escapeHtml(biz.description || '')}</textarea></div>
@@ -2185,7 +2185,7 @@ function agentJobs(agent) {
       <button class="chip ${agent.status === 'online' ? 'on' : ''}" data-action="toggle-agent-status">${isOffline ? 'Go online' : 'Go offline'}</button>
     </div>
 
-    <div class="card" style="display:flex;align-items:center;gap:10px;padding:12px 14px;">
+    <div class="card" style="display:flex;align-items:center;gap:10px;padding:12px 16px;">
       <span style="width:10px;height:10px;border-radius:50%;background:${statusColor};flex-shrink:0;"></span>
       <div style="flex:1;">
         <div style="font-weight:700;font-size:13.5px;">${statusLabel}</div>
@@ -2284,7 +2284,7 @@ function agentActiveDelivery(agent) {
     </div>
 
     <!-- Progress strip -->
-    <div class="card" style="padding:14px 16px;">
+    <div class="card" style="padding:16px 16px;">
       <div style="display:flex;align-items:center;gap:6px;">
         ${stages.map((label, i) => {
           const done = i < stageIdx;
@@ -2293,7 +2293,7 @@ function agentActiveDelivery(agent) {
           const textColor = done || current ? 'var(--color-primary-dark)' : 'var(--color-text-faint)';
           return `
             <div style="flex:1;text-align:center;">
-              <div style="height:4px;border-radius:2px;background:${color};margin-bottom:6px;"></div>
+              <div style="height:4px;border-radius:2px;background:${color};margin-bottom:8px;"></div>
               <div style="font-size:11px;font-weight:700;color:${textColor};">${label}</div>
             </div>`;
         }).join('')}
@@ -2341,7 +2341,7 @@ function agentActiveDelivery(agent) {
         </div>
       </div>
 
-      ${active.deliveryInstructions ? `<p class="text-sm text-faint mt-12" style="margin-bottom:0;padding:8px 10px;background:var(--color-surface-alt);border-radius:8px;">Note from customer: ${escapeHtml(active.deliveryInstructions)}</p>` : ''}
+      ${active.deliveryInstructions ? `<p class="text-sm text-faint mt-12" style="margin-bottom:0;padding:8px 12px;background:var(--color-surface-alt);border-radius:8px;">Note from customer: ${escapeHtml(active.deliveryInstructions)}</p>` : ''}
     </div>
 
     <!-- Pickup checklist -->
@@ -2354,7 +2354,7 @@ function agentActiveDelivery(agent) {
         ${active.items.map((it, i) => {
           const done = !!checklist[String(i)];
           return `
-            <div class="flex items-center gap-10 pressable" style="padding:10px 4px;border-bottom:1px solid var(--color-border-soft);cursor:pointer;" data-action="agent-toggle-checklist" data-order-id="${active.id}" data-index="${i}">
+            <div class="flex items-center gap-10 pressable" style="padding:12px 4px;border-bottom:1px solid var(--color-border-soft);cursor:pointer;" data-action="agent-toggle-checklist" data-order-id="${active.id}" data-index="${i}">
               <div style="width:22px;height:22px;border-radius:6px;border:2px solid ${done ? 'var(--color-primary)' : 'var(--color-border)'};background:${done ? 'var(--color-primary)' : 'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 ${done ? `<span style="color:#fff;font-size:13px;">✓</span>` : ''}
               </div>
@@ -2437,7 +2437,7 @@ function agentEarnings(agent) {
 
     <div class="card" style="background:linear-gradient(120deg,var(--color-primary-dark) 0%,var(--color-primary) 100%);color:#fff;border:none;">
       <div class="text-sm" style="opacity:.85;font-weight:700;letter-spacing:.05em;text-transform:uppercase;">Available balance</div>
-      <div style="font-family:var(--font-display);font-size:34px;font-weight:700;margin:6px 0 4px;">${formatNaira(agent.earningsPending || 0)}</div>
+      <div style="font-family:var(--font-display);font-size:34px;font-weight:700;margin:8px 0 4px;">${formatNaira(agent.earningsPending || 0)}</div>
       <div class="text-sm" style="opacity:.85;">Pending payout to your bank account</div>
     </div>
 
@@ -2450,7 +2450,7 @@ function agentEarnings(agent) {
 
     <div class="card mt-12">
       <strong style="font-size:13px;">Last 7 days</strong>
-      <div class="bar-chart" style="margin-top:14px;">
+      <div class="bar-chart" style="margin-top:16px;">
         ${perDay.map((v, i) => `<div class="bar-col">
           <div class="bar" style="height:${Math.max(4, (v / maxDay) * 110)}px;"></div>
           <span class="lbl">${days[i].toLocaleDateString('en-NG', { weekday: 'short' })}</span>
@@ -2503,7 +2503,7 @@ function agentProfile(agent) {
   return `
     <div class="page-head"><h1>Profile</h1></div>
 
-    <div class="card" style="text-align:center;padding:22px 16px;">
+    <div class="card" style="text-align:center;padding:24px 16px;">
       <div style="width:72px;height:72px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:26px;margin:0 auto 12px;">${initials(agent.name)}</div>
       <strong style="font-size:18px;">${escapeHtml(agent.name)}</strong>
       ${agent.verified ? `<div class="flex items-center gap-6 mt-8" style="justify-content:center;color:var(--color-primary);font-weight:700;font-size:13px;">${ICONS.verified} Verified agent</div>` : `<div class="text-sm text-muted mt-8">Verification pending</div>`}
@@ -2527,11 +2527,11 @@ function agentProfile(agent) {
     </div>
 
     <div class="card mt-12" style="padding:0;">
-      <div class="flex items-center justify-between pressable" style="padding:14px 16px;border-bottom:1px solid var(--color-border);cursor:pointer;" data-action="contact-support">
+      <div class="flex items-center justify-between pressable" style="padding:16px 16px;border-bottom:1px solid var(--color-border);cursor:pointer;" data-action="contact-support">
         <div class="flex items-center gap-10">${ICONS.phone}<span style="font-weight:600;font-size:14px;">Contact support</span></div>
         ${ICONS.chevronRight}
       </div>
-      <div class="flex items-center justify-between pressable" style="padding:14px 16px;cursor:pointer;" data-action="nav" data-view="agent-earnings">
+      <div class="flex items-center justify-between pressable" style="padding:16px 16px;cursor:pointer;" data-action="nav" data-view="agent-earnings">
         <div class="flex items-center gap-10">${ICONS.wallet}<span style="font-weight:600;font-size:14px;">View earnings</span></div>
         ${ICONS.chevronRight}
       </div>
@@ -2758,7 +2758,7 @@ function adminCustomers() {
   if (q) list = list.filter((c) => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q));
   return `
     <div class="page-head"><h1>Customers</h1></div>
-    <input type="text" placeholder="Search customers by name or phone" id="admin-cust-search" value="${escapeHtml(state.params.q || '')}" style="margin-bottom:14px;" />
+    <input type="text" placeholder="Search customers by name or phone" id="admin-cust-search" value="${escapeHtml(state.params.q || '')}" style="margin-bottom:16px;" />
     ${list.length ? `<div class="row-cards">${list.map((c) => {
       const orders = getOrders({ customerId: c.id });
       return `<div class="row-card flex items-center justify-between"><div><div style="font-weight:700;font-size:13.5px;">${escapeHtml(c.name)}</div><div class="text-sm text-muted">${escapeHtml(c.phone || '')} · ${orders.length} orders</div></div></div>`;
@@ -2824,7 +2824,7 @@ function adminOrderDetail(orderId) {
           <div class="summary-row"><span>Agent</span><span class="val">${agent ? escapeHtml(agent.name) : 'Not yet assigned'}</span></div>
         </div>
         <div class="card mt-12"><strong style="font-size:13px;">Items</strong>
-          <div class="mt-8">${o.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
+          <div class="mt-8">${o.items.map((it) => `<div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:8px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>`).join('')}</div>
         </div>
         ${!agent && !['delivered', 'cancelled'].includes(o.status) ? `
         <div class="card mt-12">
@@ -3128,7 +3128,7 @@ function adminDisputes() {
           ${o ? `<div class="row-card-sub">Order ${escapeHtml(o.orderNumber)}</div>` : ''}
           <p class="text-sm" style="margin-top:8px;line-height:1.5;">${escapeHtml(t.body)}</p>
           ${t.adminReply ? `
-            <div style="margin-top:10px;padding:10px 12px;background:var(--color-primary-tint);border-radius:8px;">
+            <div style="margin-top:12px;padding:12px 12px;background:var(--color-primary-tint);border-radius:8px;">
               <strong style="font-size:12px;color:var(--color-primary-dark);">Your reply</strong>
               <p class="text-sm mt-4" style="margin:4px 0 0;color:var(--color-primary-dark);">${escapeHtml(t.adminReply)}</p>
             </div>` : ''}
@@ -3217,7 +3217,7 @@ function adminBusinessNew() {
           </div>
         </div>
       </div>
-      <div class="auth-error" id="cb-error" style="margin:6px 0 0;"></div>
+      <div class="auth-error" id="cb-error" style="margin:8px 0 0;"></div>
     </div>
     <div class="sticky-bottom-bar">
       <button class="btn btn-outline btn-block" data-action="back">Cancel</button>
@@ -3259,7 +3259,7 @@ function adminBusinessEdit(id) {
           </select>
         </div>
       </div>
-      <div class="auth-error" id="eb-error" style="margin:6px 0 0;"></div>
+      <div class="auth-error" id="eb-error" style="margin:8px 0 0;"></div>
     </div>
 
     <div class="card mt-12">
@@ -3295,7 +3295,7 @@ function adminBusinessEdit(id) {
           <button type="button" class="btn btn-outline btn-sm" data-action="gen-password" data-target="eb-newPassword">Generate</button>
         </div>
       </div>
-      <div class="auth-error" id="eb-pw-error" style="margin:6px 0 0;"></div>
+      <div class="auth-error" id="eb-pw-error" style="margin:8px 0 0;"></div>
       <button class="btn btn-primary btn-block mt-12" data-action="admin-reset-password" data-id="${b.id}">Reset password</button>
     </div>
 
@@ -3339,7 +3339,7 @@ function adminAgentEdit(id) {
           </select>
         </div>
       </div>
-      <div class="auth-error" id="ea-error" style="margin:6px 0 0;"></div>
+      <div class="auth-error" id="ea-error" style="margin:8px 0 0;"></div>
     </div>
 
     <div class="card mt-12">
@@ -3352,7 +3352,7 @@ function adminAgentEdit(id) {
           <button type="button" class="btn btn-outline btn-sm" data-action="gen-password" data-target="ea-newPassword">Generate</button>
         </div>
       </div>
-      <div class="auth-error" id="ea-pw-error" style="margin:6px 0 0;"></div>
+      <div class="auth-error" id="ea-pw-error" style="margin:8px 0 0;"></div>
       <button class="btn btn-primary btn-block mt-12" data-action="admin-reset-agent-password" data-id="${a.id}">Reset password</button>
     </div>
 
@@ -3395,7 +3395,7 @@ function adminAgentNew() {
           </div>
         </div>
       </div>
-      <div class="auth-error" id="ca-error" style="margin:6px 0 0;"></div>
+      <div class="auth-error" id="ca-error" style="margin:8px 0 0;"></div>
     </div>
     <div class="sticky-bottom-bar">
       <button class="btn btn-outline btn-block" data-action="back">Cancel</button>
@@ -3424,7 +3424,7 @@ function businessTeam(biz) {
           </div>
         </div>
       </div>
-      <div class="auth-error" id="st-error" style="margin:6px 0 0;"></div>
+      <div class="auth-error" id="st-error" style="margin:8px 0 0;"></div>
       <button class="btn btn-primary btn-block mt-12" data-action="biz-create-staff">Create staff account</button>
     </div>
     <div class="section-title-row"><h2>Staff members</h2></div>
@@ -3579,7 +3579,7 @@ function renderChatMessages() {
   if (!visible.length) {
     const label = (chatChannelsForRole(me.role).find((c) => c.id === _chatActiveChannel) || {}).label || 'this channel';
     const visibility = chatChannelVisibility(_chatActiveChannel);
-    wrap.innerHTML = `<div class="text-sm text-muted" style="text-align:center;padding:24px 6px;">
+    wrap.innerHTML = `<div class="text-sm text-muted" style="text-align:center;padding:24px 8px;">
       <div style="font-weight:700;color:var(--color-text);margin-bottom:4px;">No messages in ${escapeHtml(label)} yet.</div>
       <div style="font-size:11.5px;">${escapeHtml(visibility)}</div>
     </div>`;
@@ -3594,9 +3594,9 @@ function renderChatMessages() {
     } else {
       mine = m.senderRole === me.role && m.senderName === me.name;
     }
-    return `<div style="display:flex;flex-direction:column;align-items:${mine ? 'flex-end' : 'flex-start'};margin-bottom:10px;">
-      <div style="font-size:11px;color:var(--color-text-faint);margin-bottom:3px;">${escapeHtml(m.senderName || m.senderRole || 'User')} · ${timeAgo(m.createdAt)}</div>
-      <div style="max-width:80%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.4;${mine
+    return `<div style="display:flex;flex-direction:column;align-items:${mine ? 'flex-end' : 'flex-start'};margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--color-text-faint);margin-bottom:4px;">${escapeHtml(m.senderName || m.senderRole || 'User')} · ${timeAgo(m.createdAt)}</div>
+      <div style="max-width:80%;padding:8px 12px;border-radius:14px;font-size:13.5px;line-height:1.4;${mine
         ? 'background:var(--color-primary);color:#fff;border-bottom-right-radius:3px;'
         : 'background:var(--color-surface-alt);color:var(--color-text);border-bottom-left-radius:3px;'}">${escapeHtml(m.body)}</div>
     </div>`;
@@ -3626,7 +3626,7 @@ function chatClaimBannerHtml(order) {
   const claimedByName = order.chatClaimedByName || 'Another teammate';
 
   if (!order.chatClaimedBy) {
-    return `<div class="card" style="background:var(--color-accent-tint);border-color:var(--color-accent);margin-bottom:10px;padding:10px 12px;">
+    return `<div class="card" style="background:var(--color-accent-tint);border-color:var(--color-accent);margin-bottom:12px;padding:12px 12px;">
       <div class="flex items-center justify-between">
         <div>
           <strong style="font-size:12.5px;color:var(--color-accent-dark);">Unclaimed chat</strong>
@@ -3638,7 +3638,7 @@ function chatClaimBannerHtml(order) {
   }
 
   if (claimedByMe) {
-    return `<div class="card" style="background:var(--color-primary-tint);border-color:var(--color-primary);margin-bottom:10px;padding:10px 12px;">
+    return `<div class="card" style="background:var(--color-primary-tint);border-color:var(--color-primary);margin-bottom:12px;padding:12px 12px;">
       <div class="flex items-center justify-between">
         <div>
           <strong style="font-size:12.5px;color:var(--color-primary-dark);">You are handling this chat</strong>
@@ -3649,7 +3649,7 @@ function chatClaimBannerHtml(order) {
     </div>`;
   }
 
-  return `<div class="card" style="background:var(--color-surface-alt);border-color:var(--color-border);margin-bottom:10px;padding:10px 12px;">
+  return `<div class="card" style="background:var(--color-surface-alt);border-color:var(--color-border);margin-bottom:12px;padding:12px 12px;">
     <strong style="font-size:12.5px;">Claimed by ${escapeHtml(claimedByName)}</strong>
     <p class="text-sm mt-4" style="margin:0;color:var(--color-text-muted);">You can read this chat but not reply. Ask them to release it if you need to take over.</p>
   </div>`;
@@ -3690,7 +3690,7 @@ function openOrderChat(orderId, opts) {
     : escapeHtml((getBusiness(order.businessId) || {}).name || '');
 
   const ticketBanner = ticket ? `
-    <div class="card" style="background:var(--color-accent-tint);border-color:var(--color-accent);padding:10px 12px;margin-bottom:10px;">
+    <div class="card" style="background:var(--color-accent-tint);border-color:var(--color-accent);padding:12px 12px;margin-bottom:12px;">
       <div class="flex items-center justify-between">
         <div>
           <strong style="font-size:12.5px;color:var(--color-accent-dark);">${ticket.status === 'resolved' ? 'This ticket is resolved' : 'Support ticket: ' + escapeHtml(ticket.subject)}</strong>
@@ -3710,7 +3710,7 @@ function openOrderChat(orderId, opts) {
     <div class="modal-head">
       <div>
         <h3>${headerTitle}</h3>
-        <div class="text-sm text-muted" style="margin-top:2px;">${headerSub}</div>
+        <div class="text-sm text-muted" style="margin-top:4px;">${headerSub}</div>
       </div>
       <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
     </div>
@@ -3725,12 +3725,12 @@ function openOrderChat(orderId, opts) {
       if (_b.phone) rows.push({ label: 'Call business', sub: _b.name, phone: _b.phone });
       if (_a && _a.phone) rows.push({ label: 'Call agent', sub: _a.name, phone: _a.phone });
       if (!rows.length) return '';
-      return `<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:6px;">
+      return `<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px;">
         ${rows.map((r) => `<a class="btn btn-outline btn-sm" href="tel:${escapeHtml(r.phone)}" style="flex-shrink:0;">${ICONS.phone} ${escapeHtml(r.label)}</a>`).join('')}
       </div>`;
     })() : ''}
-    <div id="chat-tabs" style="display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--color-border);padding-bottom:2px;margin-bottom:8px;"></div>
-    <div id="chat-messages" style="max-height:320px;overflow-y:auto;padding:10px 4px 6px;border-radius:var(--radius-sm);background:var(--color-bg);"></div>
+    <div id="chat-tabs" style="display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--color-border);padding-bottom:4px;margin-bottom:8px;"></div>
+    <div id="chat-messages" style="max-height:320px;overflow-y:auto;padding:12px 4px 6px;border-radius:var(--radius-sm);background:var(--color-bg);"></div>
     <div style="display:flex;gap:8px;margin-top:12px;">
       <input type="text" id="chat-input" placeholder="${inputLocked ? (ticketLocked ? 'Ticket resolved — reopen to reply' : 'Chat is locked to another teammate') : 'Type a message…'}" style="flex:1;" autocomplete="off" ${inputLocked ? 'disabled' : ''} />
       <button class="btn btn-primary" data-action="chat-send" data-order-id="${orderId}" ${inputLocked ? 'disabled' : ''}>Send</button>
@@ -3821,7 +3821,7 @@ function openOrderSummary(orderId) {
   const cust = getCustomer(o.customerId) || { name: 'Customer', phone: '' };
   const agent = o.agentId ? getAgent(o.agentId) : null;
   const itemsHtml = (o.items || []).map((it) => `
-    <div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:6px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>
+    <div class="summary-row"><span>${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" alt="" style="width:24px;height:24px;border-radius:5px;object-fit:cover;vertical-align:middle;margin-right:8px;" />` : ''}${it.qty} × ${escapeHtml(it.name)}</span><span class="val">${formatNaira(it.price * it.qty)}</span></div>
   `).join('');
   const history = (o.statusHistory || []).map((h, i, arr) => `
     <div class="timeline-step done">
@@ -3837,12 +3837,12 @@ function openOrderSummary(orderId) {
     <div class="modal-head">
       <div>
         <h3>${escapeHtml(o.orderNumber)}</h3>
-        <div class="text-sm text-muted" style="margin-top:2px;">${escapeHtml(biz.name)}</div>
+        <div class="text-sm text-muted" style="margin-top:4px;">${escapeHtml(biz.name)}</div>
       </div>
       <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
     </div>
 
-    <div class="flex items-center gap-8" style="margin-bottom:10px;">
+    <div class="flex items-center gap-8" style="margin-bottom:12px;">
       ${orderStatusBadge(o.status)}
       <span class="text-sm text-muted">${formatDate(o.createdAt)}</span>
     </div>
@@ -3854,7 +3854,7 @@ function openOrderSummary(orderId) {
       const isAgent = me.role === 'agent';
 
       const itemsBlock = `
-        <div class="card" style="background:var(--color-bg);border:none;padding:14px;">
+        <div class="card" style="background:var(--color-bg);border:none;padding:16px;">
           <strong style="font-size:13px;">Items</strong>
           <div class="mt-8">${itemsHtml}</div>
           <hr class="divider" />
@@ -4121,7 +4121,7 @@ function adminSupport() {
             ${o ? `<div class="row-card-sub">Order ${escapeHtml(o.orderNumber)}</div>` : ''}
             <p class="text-sm" style="margin-top:8px;line-height:1.5;">${escapeHtml(t.body)}</p>
             ${t.adminReply ? `
-              <div style="margin-top:10px;padding:10px 12px;background:var(--color-primary-tint);border-radius:8px;">
+              <div style="margin-top:12px;padding:12px 12px;background:var(--color-primary-tint);border-radius:8px;">
                 <strong style="font-size:12px;color:var(--color-primary-dark);">Your reply</strong>
                 <p class="text-sm mt-4" style="margin:4px 0 0;color:var(--color-primary-dark);">${escapeHtml(t.adminReply)}</p>
                 <div class="text-sm mt-4" style="color:var(--color-primary-dark);opacity:.7;">${timeAgo(t.repliedAt)}</div>
@@ -4147,7 +4147,7 @@ function openSupportReplyModal(ticketId) {
       <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
     </div>
     <p class="text-sm text-muted"><strong>${escapeHtml(t.subject)}</strong> from ${escapeHtml(t.openedByName || 'user')}</p>
-    <p class="text-sm" style="padding:10px 12px;background:var(--color-surface-alt);border-radius:8px;margin-top:10px;line-height:1.5;">${escapeHtml(t.body)}</p>
+    <p class="text-sm" style="padding:12px 12px;background:var(--color-surface-alt);border-radius:8px;margin-top:12px;line-height:1.5;">${escapeHtml(t.body)}</p>
     <div class="form-group mt-12">
       <label>Your reply</label>
       <textarea id="sup-reply" placeholder="Type your response to the user…" style="min-height:100px;"></textarea>
@@ -5121,7 +5121,7 @@ async function placeOrderFlow() {
   const payBtn = document.querySelector('.sticky-bottom-bar button');
   if (payBtn) payBtn.disabled = true;
   if (area) {
-    area.innerHTML = `<div class="card mt-12 flex-col items-center" style="text-align:center;padding:26px;">
+    area.innerHTML = `<div class="card mt-12 flex-col items-center" style="text-align:center;padding:24px;">
       <div class="skeleton" style="width:44px;height:44px;border-radius:50%;margin-bottom:12px;"></div>
       <strong>Opening secure payment…</strong>
       <p class="text-sm text-muted mt-8">Pay with your card, bank transfer, or USSD. Do not close this screen.</p>
@@ -5160,7 +5160,7 @@ async function placeOrderFlow() {
 
   // Payment succeeded at Paystack. Now verify server-side before creating the order.
   if (area) {
-    area.innerHTML = `<div class="card mt-12 flex-col items-center" style="text-align:center;padding:26px;">
+    area.innerHTML = `<div class="card mt-12 flex-col items-center" style="text-align:center;padding:24px;">
       <strong>Verifying payment…</strong>
       <p class="text-sm text-muted mt-8">Almost done. Do not close this screen.</p>
     </div>`;
@@ -5189,7 +5189,7 @@ async function placeOrderFlow() {
   const verify = await window.PXDynastySBC.verifyPayment(result.reference, drafts);
 
   if (!verify.ok) {
-    if (area) area.innerHTML = `<div class="card mt-12" style="text-align:center;padding:22px;border-color:var(--color-error);background:var(--color-error-tint);">
+    if (area) area.innerHTML = `<div class="card mt-12" style="text-align:center;padding:24px;border-color:var(--color-error);background:var(--color-error-tint);">
       <strong style="color:var(--color-error);">Payment could not be verified</strong>
       <p class="text-sm mt-8" style="color:var(--color-error);margin-bottom:0;">${escapeHtml(verify.error || 'Unknown error')}. Save this reference and contact support: <strong>${escapeHtml(result.reference)}</strong></p>
     </div>`;
