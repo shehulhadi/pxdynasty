@@ -1908,7 +1908,7 @@ function businessProducts(biz) {
     ${products.length ? `<div class="row-cards mobile-only-cards">
       ${products.map((p) => `<div class="row-card">
         <div class="flex gap-10">
-          <div class="thumb-sm" style="overflow:hidden;">${placeholderThumb(p.hue, p.emoji)}</div>
+          <div class="thumb-sm" style="overflow:hidden;">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;" />` : placeholderThumb(p.hue, p.emoji)}</div>
           <div style="flex:1;">
             <div class="row-card-top" style="margin-bottom:0;"><span class="row-card-title">${escapeHtml(p.name)}</span><span class="status-badge ${PRODUCT_STATUS_CLASS[p.status]}">${PRODUCT_STATUS_LABEL[p.status]}</span></div>
             <div class="row-card-sub">${formatNaira(p.discountPrice || p.price)} · Stock: ${p.stock} · ${p.sales || 0} sold</div>
@@ -2776,7 +2776,7 @@ function adminProducts() {
     </div>
     ${list.length ? `<div class="row-cards">${list.map((p) => `<div class="row-card">
       <div class="flex gap-10">
-        <div class="thumb-sm" style="overflow:hidden;">${placeholderThumb(p.hue, p.emoji)}</div>
+        <div class="thumb-sm" style="overflow:hidden;">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;" />` : placeholderThumb(p.hue, p.emoji)}</div>
         <div style="flex:1;">
           <div class="row-card-top" style="margin-bottom:0;"><span class="row-card-title">${escapeHtml(p.name)}</span><span class="status-badge ${PRODUCT_STATUS_CLASS[p.status]}">${PRODUCT_STATUS_LABEL[p.status]}</span></div>
           <div class="row-card-sub">${escapeHtml((getBusiness(p.businessId) || {}).name || '')} · ${formatNaira(p.discountPrice || p.price)}</div>
