@@ -5264,7 +5264,26 @@ async function placeOrderFlow() {
     d.paymentVerifiedAt = now;
     DB.orders.unshift(d);
   });
+
+  // Bump product sales + decrement stock, and push to Supabase.
+  const touchedProducts = new Map();
+  drafts.forEach((d) => {
+    (d.items || []).forEach((it) => {
+      const p = getProduct(it.productId);
+      if (!p) return;
+      const qty = Math.max(1, Number(it.qty) || 1);
+      p.sales = (p.sales || 0) + qty;
+      p.stock = Math.max(0, (p.stock || 0) - qty);
+      if (p.stock === 0 && p.status === 'active') p.status = 'out_of_stock';
+      touchedProducts.set(p.id, p);
+    });
+  });
   saveDataLocalOnly();
+  if (window.PXDynastySBC && window.PXDynastySBC.upsertProduct) {
+    touchedProducts.forEach((p) => {
+      window.PXDynastySBC.upsertProduct(p).catch((e) => console.warn('product upsert failed', e));
+    });
+  }
 
   state.cart = [];
   saveCart();
