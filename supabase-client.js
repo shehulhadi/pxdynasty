@@ -53,6 +53,8 @@ function sbcRowToBiz(r) {
     deliveryNote: r.delivery_note || null,
     whatsapp: r.whatsapp || null,
     tags: r.tags || [],
+    lat: r.lat != null ? Number(r.lat) : null,
+    lng: r.lng != null ? Number(r.lng) : null,
     createdAt: r.created_at,
   };
 }
@@ -84,6 +86,7 @@ function sbcRowToOrder(r) {
     businessId: r.business_id,
     items: r.items,
     subtotal: Number(r.subtotal),
+    distanceKm: r.distance_km != null ? Number(r.distance_km) : null,
     deliveryFee: Number(r.delivery_fee),
     platformFee: Number(r.platform_fee),
     total: Number(r.total),
@@ -165,6 +168,8 @@ function sbcBizToRow(b) {
     delivery_note: b.deliveryNote || null,
     whatsapp: b.whatsapp || null,
     tags: b.tags || [],
+    lat: b.lat != null ? b.lat : null,
+    lng: b.lng != null ? b.lng : null,
   };
 }
 function sbcProductToRow(p) {
@@ -180,6 +185,7 @@ function sbcOrderToRow(o) {
   return {
     id: o.id, order_number: o.orderNumber, customer_id: o.customerId,
     business_id: o.businessId, items: o.items, subtotal: o.subtotal,
+    distance_km: o.distanceKm != null ? o.distanceKm : null,
     delivery_fee: o.deliveryFee, platform_fee: o.platformFee, total: o.total,
     status: o.status, payment_status: o.paymentStatus, agent_id: o.agentId,
     delivery_address: o.deliveryAddress, delivery_instructions: o.deliveryInstructions,

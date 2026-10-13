@@ -83,13 +83,79 @@ function categoryEmoji(cat) {
   return found ? found.icon : '🛍️';
 }
 
+
+/* ==========================================================================
+   GEO HELPERS — distance-based delivery
+   ========================================================================== */
+
+// Haversine distance between two lat/lng points, in kilometres.
+function haversineKm(lat1, lng1, lat2, lng2) {
+  if ([lat1, lng1, lat2, lng2].some((v) => typeof v !== 'number' || isNaN(v))) return null;
+  const R = 6371;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Extract lat/lng from a Google Maps URL. Handles:
+//   https://maps.app.goo.gl/XXXX          → cannot parse (short link, needs server)
+//   https://www.google.com/maps/@6.1,7.2,15z
+//   https://www.google.com/maps/place/.../@6.1,7.2,15z/data=...
+//   ?q=6.123,7.456  or  ?query=6.123,7.456  or  ?ll=6.123,7.456
+function parseMapsUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  const u = url.trim();
+  // @lat,lng,zoom
+  let m = u.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  // ?q=lat,lng / query / ll
+  m = u.match(/[?&](?:q|query|ll|center)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  // Bare "lat,lng" paste
+  m = u.match(/^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)$/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  return null;
+}
+
+// Is a Maps URL short? Short links (maps.app.goo.gl/…) need a server-side
+// resolver, which we don't have yet.
+function isShortMapsUrl(url) {
+  return !!url && /maps\.app\.goo\.gl|goo\.gl\/maps/i.test(url);
+}
+
+// Best-effort device geolocation. Returns { lat, lng } or null.
+function getCurrentCoords() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  });
+}
+
+// Compute the delivery fee from a km distance.
+function deliveryFeeForKm(km, settings) {
+  const rate = settings.deliveryRatePerKm || 200;
+  const floor = settings.deliveryMinFee || 500;
+  if (km == null) return floor;
+  return Math.max(floor, Math.round((km * rate) / 10) * 10);
+}
+
 function defaultSettings() {
   return {
     commissionPercent: 5,
     platformServiceFeePercent: 1.5,
     platformServiceFeeMin: 300,
     baseDeliveryFee: 1000,
-    agentSharePercent: 70,
+    deliveryRatePerKm: 200,
+    deliveryMinFee: 500,
+    agentSharePercent: 80,
     categoryCommission: { electronics: 4, phones: 4, building: 3.5 },
     zones: [
       { id: 'zone-a', name: 'Zone A', minKm: 0, maxKm: 3, fee: 700 },
@@ -378,8 +444,10 @@ function getOrder(id) { return DB.orders.find((o) => o.id === id); }
 function getCustomer(id) { return DB.customers.find((c) => c.id === id); }
 function getAgent(id) { return DB.agents.find((a) => a.id === id); }
 
-function calcOrderFinancials(subtotal, settings) {
-  const deliveryFee = settings.baseDeliveryFee;
+function calcOrderFinancials(subtotal, settings, distanceKm) {
+  // Distance-based fee when lat/lng are known; otherwise fall back to base.
+  const hasDistance = typeof distanceKm === "number" && distanceKm > 0;
+  const deliveryFee = hasDistance ? deliveryFeeForKm(distanceKm, settings) : settings.baseDeliveryFee;
   const platformFee = Math.round(subtotal * (settings.platformServiceFeePercent / 100) / 10) * 10 || settings.platformServiceFeeMin;
   const total = subtotal + deliveryFee + platformFee;
   const businessCommission = Math.round(subtotal * (settings.commissionPercent / 100));
@@ -389,7 +457,20 @@ function calcOrderFinancials(subtotal, settings) {
   return { deliveryFee, platformFee, total, businessCommission, businessReceives, agentPayment, platformGrossRevenue };
 }
 
-function calculateOrderTotal(cartLines) {
+// Resolve the customer's currently-selected delivery coords.
+function currentCheckoutCoords() {
+  const cust = getCustomer(state.currentCustomerId);
+  if (!cust || !Array.isArray(cust.addresses) || !cust.addresses.length) return null;
+  const cd = state.checkoutData || {};
+  let addr = null;
+  if (cd.addressId) addr = cust.addresses.find((a) => a.id === cd.addressId) || null;
+  if (!addr) addr = cust.addresses.find((a) => a.isDefault) || cust.addresses[0];
+  if (!addr || typeof addr.lat !== "number" || typeof addr.lng !== "number") return null;
+  return { lat: addr.lat, lng: addr.lng };
+}
+
+
+function calculateOrderTotal(cartLines, customerCoords) {
   // Group cart lines by business so each gets its own delivery fee and
   // its own order at checkout.
   const byBiz = {};
@@ -401,11 +482,17 @@ function calculateOrderTotal(cartLines) {
   const perBusiness = Object.keys(byBiz).map((bid) => {
     const items = byBiz[bid];
     const subtotal = items.reduce((s, l) => s + (l.product.discountPrice || l.product.price) * l.qty, 0);
-    const calc = calcOrderFinancials(subtotal, DB.settings);
+    const biz = getBusiness(bid);
+    let distanceKm = null;
+    if (customerCoords && biz && typeof biz.lat === "number" && typeof biz.lng === "number") {
+      distanceKm = haversineKm(biz.lat, biz.lng, customerCoords.lat, customerCoords.lng);
+    }
+    const calc = calcOrderFinancials(subtotal, DB.settings, distanceKm);
     return {
       businessId: bid,
       items,
       subtotal,
+      distanceKm,
       deliveryFee: calc.deliveryFee,
       platformFee: calc.platformFee,
       total: calc.total,
@@ -427,7 +514,7 @@ function calculateOrderTotal(cartLines) {
 
 function buildOrderDraft(data) {
   const subtotal = data.items.reduce((s, it) => s + it.price * it.qty, 0);
-  const calc = calcOrderFinancials(subtotal, DB.settings);
+  const calc = calcOrderFinancials(subtotal, DB.settings, data.distanceKm);
   return {
     id: genId('ord'),
     orderNumber: genOrderNumber(),
@@ -435,6 +522,7 @@ function buildOrderDraft(data) {
     businessId: data.businessId,
     items: data.items,
     subtotal,
+    distanceKm: data.distanceKm || null,
     deliveryFee: calc.deliveryFee,
     platformFee: calc.platformFee,
     discount: 0,
@@ -462,7 +550,7 @@ function buildOrderDraft(data) {
 
 function createOrder(data) {
   const subtotal = data.items.reduce((s, it) => s + it.price * it.qty, 0);
-  const calc = calcOrderFinancials(subtotal, DB.settings);
+  const calc = calcOrderFinancials(subtotal, DB.settings, data.distanceKm);
   const order = {
     id: genId('ord'),
     orderNumber: genOrderNumber(),
@@ -472,6 +560,7 @@ function createOrder(data) {
     subtotal,
     deliveryFee: calc.deliveryFee,
     platformFee: calc.platformFee,
+    distanceKm: data.distanceKm || null,
     discount: 0,
     total: calc.total,
     status: 'placed',
@@ -1185,7 +1274,7 @@ function customerCart() {
       ${emptyState('cart', 'Your cart is empty', 'Browse the marketplace and add products you love.', `<button class="btn btn-primary btn-sm" data-action="nav" data-view="explore">Start shopping</button>`)}
       ${state.savedForLater.length ? savedForLaterHtml() : ''}`;
   }
-  const totals = calculateOrderTotal(lines);
+  const totals = calculateOrderTotal(lines, currentCheckoutCoords());
   return `
     <div class="page-head"><h1>Your cart</h1><div class="sub">${lines.length} item(s)${totals.multiBusiness ? ' · from ' + totals.perBusiness.length + ' shops' : ''}</div></div>
     ${totals.multiBusiness ? `<div class="card mt-0" style="background:var(--color-accent-tint);border-color:var(--color-accent);">
@@ -1269,7 +1358,7 @@ function customerCheckout() {
   if (!lines.length) return emptyState('cart', 'Your cart is empty', 'Add products before checking out.', `<button class="btn btn-primary btn-sm" data-action="nav" data-view="explore">Start shopping</button>`);
   const step = state.params.step || 1;
   const cust = getCustomer(state.currentCustomerId) || { name: '', phone: '', addresses: [] };
-  const totals = calculateOrderTotal(lines);
+  const totals = calculateOrderTotal(lines, currentCheckoutCoords());
   const checkoutData = state.checkoutData || (state.checkoutData = {
     name: cust.name, phone: cust.phone,
     address: (cust.addresses[0] || {}).line || '',
@@ -1603,6 +1692,8 @@ function openAddressModal(editId) {
   const cust = getCustomer(state.currentCustomerId) || {};
   const existing = editId ? (cust.addresses || []).find((a) => a.id === editId) : null;
   const isFirstEver = (cust.addresses || []).length === 0;
+  const hasCoords = existing && typeof existing.lat === 'number' && typeof existing.lng === 'number';
+  const coordLabel = hasCoords ? `${existing.lat.toFixed(5)}, ${existing.lng.toFixed(5)}` : 'Not set — tap a button below';
   openModal(`
     <div class="modal-head">
       <h3>${existing ? 'Edit address' : 'Add address'}</h3>
@@ -1617,6 +1708,21 @@ function openAddressModal(editId) {
     <div class="form-group"><label>Phone for this address (optional)</label>
       <input type="tel" id="ad-phone" placeholder="080..." value="${existing ? escapeHtml(existing.phone || '') : ''}" />
     </div>
+
+    <div class="form-group">
+      <label>Pin location for accurate delivery</label>
+      <p class="text-sm text-muted" style="margin:-4px 0 10px;">We use distance to calculate delivery fee. Pin the exact drop-off point.</p>
+      <div class="flex gap-8" style="margin-bottom:8px;">
+        <button type="button" class="btn btn-outline btn-sm" id="ad-locate-btn" style="flex:1;">📍 Use current location</button>
+        <button type="button" class="btn btn-outline btn-sm" id="ad-paste-btn" style="flex:1;">🔗 Paste Maps link</button>
+      </div>
+      <div id="ad-coords-display" style="font-size:12px;color:var(--color-text-muted);padding:8px 10px;background:var(--color-surface-alt);border-radius:var(--radius-sm);">
+        ${hasCoords ? `✓ Pinned: ${coordLabel}` : '— ' + coordLabel}
+      </div>
+      <input type="hidden" id="ad-lat" value="${hasCoords ? existing.lat : ''}" />
+      <input type="hidden" id="ad-lng" value="${hasCoords ? existing.lng : ''}" />
+    </div>
+
     <label class="radio-card ${(existing && existing.isDefault) || isFirstEver ? 'selected' : ''}" style="margin-bottom:12px;cursor:pointer;">
       <input type="checkbox" id="ad-default" ${(existing && existing.isDefault) || isFirstEver ? 'checked' : ''} ${isFirstEver ? 'disabled' : ''} />
       <span style="font-size:13.5px;">${isFirstEver ? 'Use as my default address' : 'Set as default address'}</span>
@@ -1624,7 +1730,63 @@ function openAddressModal(editId) {
     <div class="auth-error" id="ad-error"></div>
     <button class="btn btn-primary btn-block mt-12" data-action="address-save" data-id="${editId || ''}">${existing ? 'Save changes' : 'Add address'}</button>
   `);
+  wireAddressModal();
 }
+
+function wireAddressModal() {
+  const display = document.getElementById('ad-coords-display');
+  const latEl = document.getElementById('ad-lat');
+  const lngEl = document.getElementById('ad-lng');
+
+  function setCoords(lat, lng) {
+    if (latEl) latEl.value = lat;
+    if (lngEl) lngEl.value = lng;
+    if (display) {
+      display.innerHTML = `✓ Pinned: ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
+      display.style.color = 'var(--color-primary-dark)';
+      display.style.fontWeight = '700';
+    }
+  }
+
+  const locateBtn = document.getElementById('ad-locate-btn');
+  if (locateBtn) locateBtn.addEventListener('click', async () => {
+    if (display) { display.textContent = 'Getting your location…'; display.style.color = 'var(--color-text-muted)'; }
+    const coords = await getCurrentCoords();
+    if (!coords) {
+      if (display) { display.textContent = 'Could not get location. Enable GPS and try again.'; display.style.color = 'var(--color-error)'; }
+      return;
+    }
+    setCoords(coords.lat, coords.lng);
+  });
+
+  const pasteBtn = document.getElementById('ad-paste-btn');
+  if (pasteBtn) pasteBtn.addEventListener('click', async () => {
+    let text = '';
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        text = await navigator.clipboard.readText();
+      }
+    } catch (e) { /* clipboard denied — fall through to prompt */ }
+    if (!text) {
+      text = prompt('Paste the Google Maps link or "lat,lng":') || '';
+    }
+    if (!text) return;
+    if (isShortMapsUrl(text)) {
+      if (display) {
+        display.innerHTML = '⚠️ Short Google Maps links can\u2019t be read here. Open the link in Maps, then long-press the pin and copy the coordinates (e.g. <strong>9.2345, 12.4567</strong>).';
+        display.style.color = 'var(--color-warning, #b45309)';
+      }
+      return;
+    }
+    const coords = parseMapsUrl(text);
+    if (!coords) {
+      if (display) { display.textContent = 'Could not read coordinates from that link.'; display.style.color = 'var(--color-error)'; }
+      return;
+    }
+    setCoords(coords.lat, coords.lng);
+  });
+}
+
 function customerPaymentMethods() {
   const cust = getCustomer(state.currentCustomerId);
   const pref = cust ? (cust.preferredPaymentMethod || 'card') : 'card';
@@ -3243,6 +3405,20 @@ function adminBusinessNew() {
     </div>
 
     <div class="card mt-12">
+      <strong style="font-size:13px;">Pickup location</strong>
+      <p class="text-sm text-muted mt-8">Distance from this pin to the customer determines the delivery fee.</p>
+      <div class="flex gap-8" style="margin-top:10px;">
+        <button type="button" class="btn btn-outline btn-sm" data-action="biz-locate" style="flex:1;">📍 Use current location</button>
+        <button type="button" class="btn btn-outline btn-sm" data-action="biz-paste-maps" style="flex:1;">🔗 Paste Maps link</button>
+      </div>
+      <div id="eb-coords-display" style="font-size:12px;color:var(--color-text-muted);padding:8px 10px;background:var(--color-surface-alt);border-radius:var(--radius-sm);margin-top:8px;">
+        ${typeof b.lat === "number" && typeof b.lng === "number" ? `✓ Pinned: ${b.lat.toFixed(5)}, ${b.lng.toFixed(5)}` : "Not set — tap a button below"}
+      </div>
+      <input type="hidden" id="eb-lat" value="${typeof b.lat === "number" ? b.lat : ""}" />
+      <input type="hidden" id="eb-lng" value="${typeof b.lng === "number" ? b.lng : ""}" />
+    </div>
+
+    <div class="card mt-12">
       <strong style="font-size:13px;">Registration &amp; payouts</strong>
       <p class="text-sm text-muted mt-8">Required for settlement. Bank account must match the business name.</p>
       <div class="form-group"><label>CAC registration number</label><input type="text" id="cb-cac" placeholder="e.g. RC-1234567 or BN-1234567" /></div>
@@ -4404,6 +4580,112 @@ function handleAction(el, ev) {
     }
     case 'nav-home': navigate(state.role === 'customer' ? 'home' : state.role === 'business' ? 'overview' : state.role === 'agent' ? 'jobs' : 'dashboard'); break;
     case 'guest-auth-gate': openAuthGateModal(); break;
+    case 'biz-locate': {
+      const d = document.getElementById('eb-coords-display');
+      if (d) { d.textContent = 'Getting your location…'; d.style.color = 'var(--color-text-muted)'; }
+      getCurrentCoords().then((coords) => {
+        if (!coords) {
+          if (d) { d.textContent = 'Could not get location. Enable GPS and try again.'; d.style.color = 'var(--color-error)'; }
+          return;
+        }
+        const latEl = document.getElementById('eb-lat');
+        const lngEl = document.getElementById('eb-lng');
+        if (latEl) latEl.value = coords.lat;
+        if (lngEl) lngEl.value = coords.lng;
+        if (d) {
+          d.textContent = '✓ Pinned: ' + coords.lat.toFixed(5) + ', ' + coords.lng.toFixed(5);
+          d.style.color = 'var(--color-primary-dark)';
+          d.style.fontWeight = '700';
+        }
+      });
+      break;
+    }
+    case 'biz-paste-maps': {
+      const d = document.getElementById('eb-coords-display');
+      const run = (text) => {
+        if (!text) return;
+        if (isShortMapsUrl(text)) {
+          if (d) {
+            d.textContent = 'Short Maps links cannot be read here. Long-press the pin in Google Maps, then copy the coordinates (e.g. 9.2345, 12.4567).';
+            d.style.color = 'var(--color-warning, #b45309)';
+          }
+          return;
+        }
+        const coords = parseMapsUrl(text);
+        if (!coords) {
+          if (d) { d.textContent = 'Could not read coordinates from that link.'; d.style.color = 'var(--color-error)'; }
+          return;
+        }
+        const latEl = document.getElementById('eb-lat');
+        const lngEl = document.getElementById('eb-lng');
+        if (latEl) latEl.value = coords.lat;
+        if (lngEl) lngEl.value = coords.lng;
+        if (d) {
+          d.textContent = '✓ Pinned: ' + coords.lat.toFixed(5) + ', ' + coords.lng.toFixed(5);
+          d.style.color = 'var(--color-primary-dark)';
+          d.style.fontWeight = '700';
+        }
+      };
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(run).catch(() => run(prompt('Paste the Google Maps link or "lat,lng":') || ''));
+      } else {
+        run(prompt('Paste the Google Maps link or "lat,lng":') || '');
+      }
+      break;
+    }
+    case 'biz-locate': {
+      const d = document.getElementById('eb-coords-display');
+      if (d) { d.textContent = 'Getting your location…'; d.style.color = 'var(--color-text-muted)'; }
+      getCurrentCoords().then((coords) => {
+        if (!coords) {
+          if (d) { d.textContent = 'Could not get location. Enable GPS and try again.'; d.style.color = 'var(--color-error)'; }
+          return;
+        }
+        const latEl = document.getElementById('eb-lat');
+        const lngEl = document.getElementById('eb-lng');
+        if (latEl) latEl.value = coords.lat;
+        if (lngEl) lngEl.value = coords.lng;
+        if (d) {
+          d.textContent = '✓ Pinned: ' + coords.lat.toFixed(5) + ', ' + coords.lng.toFixed(5);
+          d.style.color = 'var(--color-primary-dark)';
+          d.style.fontWeight = '700';
+        }
+      });
+      break;
+    }
+    case 'biz-paste-maps': {
+      const d = document.getElementById('eb-coords-display');
+      const run = (text) => {
+        if (!text) return;
+        if (isShortMapsUrl(text)) {
+          if (d) {
+            d.innerHTML = '⚠️ Short Maps links can\u2019t be read here. Long-press the pin in Google Maps and copy the coordinates (e.g. 9.2345, 12.4567).';
+            d.style.color = 'var(--color-warning, #b45309)';
+          }
+          return;
+        }
+        const coords = parseMapsUrl(text);
+        if (!coords) {
+          if (d) { d.textContent = 'Could not read coordinates from that link.'; d.style.color = 'var(--color-error)'; }
+          return;
+        }
+        const latEl = document.getElementById('eb-lat');
+        const lngEl = document.getElementById('eb-lng');
+        if (latEl) latEl.value = coords.lat;
+        if (lngEl) lngEl.value = coords.lng;
+        if (d) {
+          d.textContent = '✓ Pinned: ' + coords.lat.toFixed(5) + ', ' + coords.lng.toFixed(5);
+          d.style.color = 'var(--color-primary-dark)';
+          d.style.fontWeight = '700';
+        }
+      };
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(run).catch(() => run(prompt('Paste the Google Maps link or "lat,lng":') || ''));
+      } else {
+        run(prompt('Paste the Google Maps link or "lat,lng":') || '');
+      }
+      break;
+    }
     case 'nav-notifications': navigate('notifications'); break;
     case 'back': goBack(); break;
     case 'toggle-role-menu': document.getElementById('role-menu').classList.toggle('open'); break;
@@ -4831,6 +5113,10 @@ function handleAction(el, ev) {
       b.bankCode = (document.getElementById('eb-bankCode') || {}).value || null;
       b.bankAccountNumber = (document.getElementById('eb-bankAccount') || {}).value || null;
       b.bankAccountName = (document.getElementById('eb-bankAccountName') || {}).value || null;
+      const ebLat = (document.getElementById('eb-lat') || {}).value || '';
+      const ebLng = (document.getElementById('eb-lng') || {}).value || '';
+      b.lat = ebLat ? parseFloat(ebLat) : null;
+      b.lng = ebLng ? parseFloat(ebLng) : null;
       saveData(DB);
       if (window.PXDynastySBC && window.PXDynastySBC.upsertBusiness) {
         window.PXDynastySBC.upsertBusiness(b).then((r) => {
@@ -5040,6 +5326,10 @@ function handleAction(el, ev) {
       const line = ((document.getElementById('ad-line') || {}).value || '').trim();
       const phone = ((document.getElementById('ad-phone') || {}).value || '').trim();
       const isDefault = (document.getElementById('ad-default') || {}).checked || false;
+      const latRaw = (document.getElementById('ad-lat') || {}).value || '';
+      const lngRaw = (document.getElementById('ad-lng') || {}).value || '';
+      const lat = latRaw ? parseFloat(latRaw) : null;
+      const lng = lngRaw ? parseFloat(lngRaw) : null;
       const errBox = document.getElementById('ad-error');
       if (!label) { if (errBox) errBox.textContent = 'Enter a label.'; break; }
       if (!line) { if (errBox) errBox.textContent = 'Enter the address.'; break; }
@@ -5048,6 +5338,7 @@ function handleAction(el, ev) {
         const a = cust.addresses.find((x) => x.id === id);
         if (a) {
           a.label = label; a.line = line; a.phone = phone;
+          a.lat = lat; a.lng = lng;
           if (isDefault) cust.addresses.forEach((x) => { x.isDefault = false; });
           a.isDefault = isDefault;
         }
@@ -5055,7 +5346,7 @@ function handleAction(el, ev) {
         const newId = 'addr-' + Math.random().toString(36).slice(2, 8);
         const firstEver = cust.addresses.length === 0;
         if (isDefault || firstEver) cust.addresses.forEach((x) => { x.isDefault = false; });
-        cust.addresses.push({ id: newId, label, line, phone, isDefault: isDefault || firstEver });
+        cust.addresses.push({ id: newId, label, line, phone, lat, lng, isDefault: isDefault || firstEver });
         if (!state.checkoutData) state.checkoutData = {};
         state.checkoutData.addressId = newId;
         state.checkoutData.address = line;
@@ -5163,7 +5454,7 @@ async function placeOrderFlow() {
   }
 
   const cd = state.checkoutData;
-  const totals = calculateOrderTotal(lines);
+  const totals = calculateOrderTotal(lines, currentCheckoutCoords());
 
   // We need an email for Paystack. Fall back to the signed-in customer's email.
   const cust = getCustomer(state.currentCustomerId) || {};
@@ -5226,7 +5517,7 @@ async function placeOrderFlow() {
   }
 
   // Build one draft per business (from the checkout totals).
-  const cartTotals = calculateOrderTotal(lines);
+  const cartTotals = calculateOrderTotal(lines, currentCheckoutCoords());
   const drafts = cartTotals.perBusiness.map((g) => buildOrderDraft({
     customerId: state.currentCustomerId,
     businessId: g.businessId,
@@ -5236,6 +5527,7 @@ async function placeOrderFlow() {
     customerName: cd.name,
     customerPhone: cd.phone,
     paymentMethod: cd.paymentMethod,
+    distanceKm: g.distanceKm != null ? g.distanceKm : null,
   }));
 
   if (!window.PXDynastySBC || !window.PXDynastySBC.verifyPayment) {
