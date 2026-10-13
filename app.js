@@ -368,7 +368,7 @@ function getProduct(id) { return DB.products.find((p) => p.id === id); }
 function getOrders(filter) {
   filter = filter || {};
   let list = DB.orders.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  if (filter.customerId) list = list.filter((o) => o.customerId === filter.customerId);
+  if ('customerId' in filter) list = list.filter((o) => o.customerId === filter.customerId);
   if (filter.businessId) list = list.filter((o) => o.businessId === filter.businessId);
   if (filter.agentId) list = list.filter((o) => o.agentId === filter.agentId);
   if (filter.status) list = list.filter((o) => (Array.isArray(filter.status) ? filter.status.includes(o.status) : o.status === filter.status));
@@ -1488,6 +1488,10 @@ function orderStatusBadge(status) {
 }
 
 function customerOrdersList() {
+  if (!state.currentCustomerId) {
+    return `<div class="page-head"><h1>Your orders</h1></div>` +
+      emptyState('orders', 'Sign in to see your orders', 'Create an account or sign in to view and track your orders.', `<button class="btn btn-primary btn-sm" data-action="guest-auth-gate">Sign in / Create account</button>`);
+  }
   const tab = state.params.tab || 'active';
   const all = getOrders({ customerId: state.currentCustomerId });
   const active = all.filter((o) => !['delivered', 'cancelled'].includes(o.status));
@@ -4399,6 +4403,7 @@ function handleAction(el, ev) {
       break;
     }
     case 'nav-home': navigate(state.role === 'customer' ? 'home' : state.role === 'business' ? 'overview' : state.role === 'agent' ? 'jobs' : 'dashboard'); break;
+    case 'guest-auth-gate': openAuthGateModal(); break;
     case 'nav-notifications': navigate('notifications'); break;
     case 'back': goBack(); break;
     case 'toggle-role-menu': document.getElementById('role-menu').classList.toggle('open'); break;
