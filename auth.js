@@ -497,10 +497,10 @@ function renderLandingPage() {
             <span class="proof-item"><strong id="proof-ord">—</strong> orders delivered</span>
           </div>
 
-          <div class="landing-trust">
-            <span class="landing-trust-item">🔒 Secured by Paystack</span>
-            <span class="landing-trust-item">✓ Verified local shops</span>
-            <span class="landing-trust-item">◎ CAC-registered operator</span>
+          <div class="landing-hero-trust">
+            <span class="landing-hero-trust-item">🔒 Secured by Paystack</span>
+            <span class="landing-hero-trust-item">✓ Verified local shops</span>
+            <span class="landing-hero-trust-item">◎ CAC-registered operator</span>
           </div>
         </div>
       </section>
