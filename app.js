@@ -953,8 +953,8 @@ function productCardHtml(p) {
 
 function businessCardHtml(b) {
   return `<div class="business-card pressable" data-action="nav" data-view="business" data-id="${b.id}">
-    <div class="cover">${placeholderThumb((b.hue + 40) % 360, categoryEmoji(b.category))}</div>
-    <div class="logo">${initials(b.name)}</div>
+    <div class="cover">${b.bannerUrl ? `<img src="${escapeHtml(b.bannerUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;" />` : placeholderThumb((b.hue + 40) % 360, categoryEmoji(b.category))}</div>
+    <div class="logo">${b.logoUrl ? `<img src="${escapeHtml(b.logoUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />` : initials(b.name)}</div>
     <div class="info">
       <div class="name">${escapeHtml(b.name)} ${b.verified ? `<span class="verified-badge">${ICONS.verified}</span>` : ''}</div>
       <div class="cat">${(CATEGORIES.find((c) => c.id === b.category) || {}).name || ''}</div>
@@ -1052,7 +1052,7 @@ function customerSearch() {
 
 function businessListItemHtml(b) {
   return `<div class="business-list-item pressable" data-action="nav" data-view="business" data-id="${b.id}">
-    <div class="logo-sq">${initials(b.name)}</div>
+    <div class="logo-sq">${b.logoUrl ? `<img src="${escapeHtml(b.logoUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />` : initials(b.name)}</div>
     <div style="flex:1;min-width:0;">
       <div class="flex items-center gap-6"><strong>${escapeHtml(b.name)}</strong>${b.verified ? `<span class="verified-badge">${ICONS.verified}</span>` : ''}</div>
       <div class="text-sm text-muted">${(CATEGORIES.find((c) => c.id === b.category) || {}).name || ''} · ${escapeHtml(b.address)}</div>
@@ -2738,7 +2738,7 @@ function adminBusinesses() {
       const revenue = orders.filter((o) => o.status === 'delivered').reduce((s, o) => s + o.subtotal, 0);
       return `<div class="row-card">
         <div class="flex gap-10">
-          <div class="logo-sq" style="width:44px;height:44px;font-size:14px;">${initials(b.name)}</div>
+          <div class="logo-sq" style="width:44px;height:44px;font-size:14px;">${b.logoUrl ? `<img src="${escapeHtml(b.logoUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />` : initials(b.name)}</div>
           <div style="flex:1;">
             <div class="row-card-top" style="margin-bottom:0;"><span class="row-card-title">${escapeHtml(b.name)}</span><span class="status-badge ${BIZ_STATUS_CLASS[b.status]}">${b.status}</span></div>
             <div class="row-card-sub">${escapeHtml(b.ownerName || '')} · ${escapeHtml(b.address || '')}</div>
