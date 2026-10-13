@@ -490,35 +490,45 @@ function renderLandingPage() {
           </div>
 
           <div class="landing-proof" id="landing-proof">
-            <span class="proof-item"><strong id="proof-biz">—</strong> local merchants</span>
+            <span class="proof-item"><strong id="proof-biz">—</strong> merchants</span>
             <span class="proof-dot">·</span>
-            <span class="proof-item"><strong id="proof-prod">—</strong> products listed</span>
+            <span class="proof-item"><strong id="proof-prod">—</strong> products</span>
             <span class="proof-dot">·</span>
-            <span class="proof-item"><strong id="proof-ord">—</strong> orders processed</span>
+            <span class="proof-item"><strong id="proof-ord">—</strong> orders delivered</span>
+          </div>
+
+          <div class="landing-trust">
+            <span class="landing-trust-item">🔒 Secured by Paystack</span>
+            <span class="landing-trust-item">✓ Verified local shops</span>
+            <span class="landing-trust-item">◎ CAC-registered operator</span>
           </div>
         </div>
       </section>
 
-      <!-- PRODUCT PREVIEW -->
-      <section class="landing-preview">
-        <div class="landing-preview-inner">
-          <div class="preview-card">
-            <div class="preview-thumb">
-              <div class="preview-thumb-inner">🍗</div>
-            </div>
-            <div class="preview-body">
-              <div class="preview-biz">PX Poultry</div>
-              <div class="preview-name">Live Broiler — whole bird</div>
-              <div class="preview-rating">★ 4.8 · 12 sold</div>
-              <div class="preview-price">₦8,500</div>
-              <div class="preview-cta">Add to cart</div>
-            </div>
-          </div>
-          <div class="preview-text">
-            <h2>Real products. Real shops. Real delivery.</h2>
-            <p>Every listing is from a verified local business. Browse their actual stock, prices, and photos — no middleman guessing.</p>
-          </div>
+      <!-- CATEGORIES -->
+      <section class="landing-section landing-cats-section">
+        <div class="landing-section-head">
+          <h2 class="landing-h2-sm">Shop by category</h2>
         </div>
+        <div class="landing-cats-scroll" id="landing-cats"></div>
+      </section>
+
+      <!-- FEATURED BUSINESSES -->
+      <section class="landing-section">
+        <div class="landing-section-head">
+          <h2 class="landing-h2-sm">Popular shops</h2>
+          <span class="landing-see-all" data-auth="show-signup">See all</span>
+        </div>
+        <div class="landing-biz-scroll" id="landing-biz"></div>
+      </section>
+
+      <!-- TRENDING PRODUCTS -->
+      <section class="landing-section">
+        <div class="landing-section-head">
+          <h2 class="landing-h2-sm">Trending today</h2>
+          <span class="landing-see-all" data-auth="show-signup">See all</span>
+        </div>
+        <div class="landing-prod-scroll" id="landing-prod"></div>
       </section>
 
       <!-- HOW IT WORKS -->
@@ -530,18 +540,24 @@ function renderLandingPage() {
           <div class="landing-steps">
             <div class="landing-step">
               <div class="landing-step-num">01</div>
-              <h3>Browse shops near you</h3>
-              <p>Pick items from any combination of local businesses. Your cart keeps them organised by shop automatically.</p>
+              <div>
+                <h3>Browse shops near you</h3>
+                <p>Pick items from any combination of local businesses. Your cart keeps them organised by shop automatically.</p>
+              </div>
             </div>
             <div class="landing-step">
               <div class="landing-step-num">02</div>
-              <h3>Pay once for everything</h3>
-              <p>One secure payment covers every shop in your cart. We split the total and settle each business fairly.</p>
+              <div>
+                <h3>Pay once for everything</h3>
+                <p>One secure payment covers every shop in your cart. We split the total and settle each business fairly.</p>
+              </div>
             </div>
             <div class="landing-step">
               <div class="landing-step-num">03</div>
-              <h3>Each shop delivers to you</h3>
-              <p>Your orders arrive separately — fresh from each kitchen, shop, or farm. Track every delivery in real time.</p>
+              <div>
+                <h3>Each shop delivers to you</h3>
+                <p>Your orders arrive separately — fresh from each kitchen, shop, or farm. Track every delivery in real time.</p>
+              </div>
             </div>
           </div>
         </div>
@@ -576,13 +592,119 @@ function renderLandingPage() {
         </div>
       </footer>
 
+      <div class="landing-sticky-cta" id="landing-sticky-cta">
+        <button class="btn btn-primary btn-block" data-auth="show-signup">Start shopping</button>
+      </div>
+
     </div>
 
-    <!-- AUTH MODAL container — the login/signup/merchant form lives here -->
+    <!-- AUTH MODAL container -->
     <div class="landing-auth-overlay" id="landing-auth-overlay" hidden>
       <div class="landing-auth-sheet" id="landing-auth-sheet"></div>
     </div>
   `;
+}
+
+function landingRenderCats() {
+  const el = document.getElementById('landing-cats');
+  if (!el || typeof CATEGORIES === 'undefined') return;
+  el.innerHTML = CATEGORIES.slice(0, 8).map((c) =>
+    `<button class="landing-cat" data-auth="guest-cat" data-cat="${c.id}">
+      <span class="landing-cat-icon">${categoryEmoji(c.id)}</span>
+      <span class="landing-cat-label">${escapeHtml(c.name)}</span>
+    </button>`
+  ).join('');
+}
+
+function landingRenderBiz() {
+  const el = document.getElementById('landing-biz');
+  if (!el || typeof DB === 'undefined') return;
+  const list = DB.businesses.filter((b) => b.status === 'active').slice(0, 6);
+  if (!list.length) { el.innerHTML = ''; return; }
+  el.innerHTML = list.map((b) => `
+    <button class="landing-biz-card" data-auth="guest-biz" data-id="${b.id}">
+      <div class="landing-biz-cover">
+        ${b.bannerUrl
+          ? `<img src="${escapeHtml(b.bannerUrl)}" alt="" loading="lazy" />`
+          : `<div class="landing-biz-cover-fallback" style="background:hsl(${(b.hue + 40) % 360} 40% 88%)">${categoryEmoji(b.category)}</div>`}
+        ${b.verified ? '<span class="landing-verified">✓</span>' : ''}
+      </div>
+      <div class="landing-biz-body">
+        <div class="landing-biz-name">${escapeHtml(b.name)}</div>
+        <div class="landing-biz-meta">${(CATEGORIES.find((c) => c.id === b.category) || {}).name || ''} · ${escapeHtml(b.deliveryEstimate || 30)}min</div>
+      </div>
+    </button>
+  `).join('');
+}
+
+function landingRenderProd() {
+  const el = document.getElementById('landing-prod');
+  if (!el || typeof DB === 'undefined') return;
+  const list = DB.products.filter((p) => p.status === 'active').slice(0, 8);
+  if (!list.length) { el.innerHTML = ''; return; }
+  el.innerHTML = list.map((p) => `
+    <button class="landing-prod-card" data-auth="guest-prod" data-id="${p.id}">
+      <div class="landing-prod-thumb">
+        ${p.imageUrl
+          ? `<img src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" />`
+          : `<div class="landing-prod-thumb-fallback" style="background:hsl(${p.hue} 40% 88%)">${p.emoji || categoryEmoji(p.category)}</div>`}
+      </div>
+      <div class="landing-prod-body">
+        <div class="landing-prod-name">${escapeHtml(p.name)}</div>
+        <div class="landing-prod-price">${formatNaira(p.discountPrice || p.price)}</div>
+      </div>
+    </button>
+  `).join('');
+}
+
+function landingBindScrollFx() {
+  // Sticky CTA appears after scrolling past hero.
+  const cta = document.getElementById('landing-sticky-cta');
+  if (cta) {
+    const onScroll = () => {
+      if (window.scrollY > 400) cta.classList.add('show');
+      else cta.classList.remove('show');
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+  // Fade-in reveal for sections.
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) { e.target.classList.add('revealed'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.landing-section, .landing-how, .landing-merchant').forEach((n) => io.observe(n));
+  }
+}
+
+function landingEnterGuest(target) {
+  // target: { type: 'biz'|'prod'|'cat', id }
+  const appEl = document.getElementById('app');
+  const appState = (typeof state !== 'undefined') ? state : null;
+  if (!appState) return;
+  appState.guestMode = true;
+  appState.role = 'customer';
+  appState.currentCustomerId = null;
+  appEl.classList.remove('auth-mode');
+  appEl.innerHTML = `
+    <div id="header-root"></div>
+    <div class="app-body">
+      <div id="sidebar-root"></div>
+      <main class="main-scroll" id="main-scroll"></main>
+    </div>
+    <div id="bottomnav-root"></div>
+  `;
+  if (typeof render === 'function') render();
+  if (target.type === 'biz') setTimeout(() => { if (typeof navigate === 'function') navigate('business', { id: target.id }); }, 50);
+  else if (target.type === 'prod') setTimeout(() => { if (typeof navigate === 'function') navigate('product', { id: target.id }); }, 50);
+  else if (target.type === 'cat') setTimeout(() => {
+    if (typeof navigate === 'function') {
+      appState.selectedCategory = target.id;
+      navigate('explore');
+    }
+  }, 50);
 }
 
 function renderLandingProofCounts() {
@@ -752,6 +874,10 @@ async function renderAuthGate() {
   if (toastEl) toastEl.innerHTML = '';
   if (modalEl) { modalEl.classList.remove('open'); modalEl.innerHTML = ''; }
   if (typeof renderLandingProofCounts === 'function') renderLandingProofCounts();
+  if (typeof landingRenderCats === 'function') landingRenderCats();
+  if (typeof landingRenderBiz === 'function') landingRenderBiz();
+  if (typeof landingRenderProd === 'function') landingRenderProd();
+  if (typeof landingBindScrollFx === 'function') landingBindScrollFx();
 }
 
 /* ---------- event wiring ---------- */
@@ -787,6 +913,9 @@ document.addEventListener('click', async (e) => {
   if (action === 'show-terms') { openLandingInfo('terms'); return; }
   if (action === 'show-privacy') { openLandingInfo('privacy'); return; }
   if (action === 'show-help') { openLandingInfo('help'); return; }
+  if (action === 'guest-cat') { landingEnterGuest({ type: 'cat', id: el.dataset.cat }); return; }
+  if (action === 'guest-biz') { landingEnterGuest({ type: 'biz', id: el.dataset.id }); return; }
+  if (action === 'guest-prod') { landingEnterGuest({ type: 'prod', id: el.dataset.id }); return; }
 
   // Auth submit (form lives in the modal)
   if (action === 'do-login') {
