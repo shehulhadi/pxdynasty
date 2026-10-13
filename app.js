@@ -5271,7 +5271,7 @@ async function placeOrderFlow() {
 
 let _pendingProductImageUrl = null;
 
-function saveProductForm(editId) {
+async function saveProductForm(editId) {
   const name = document.getElementById('pf-name').value.trim();
   if (!name) { toast('Product name is required', 'error'); return; }
   const price = parseFloat(document.getElementById('pf-price').value) || 0;
@@ -5310,6 +5310,11 @@ function saveProductForm(editId) {
   }
   _pendingProductImageUrl = null;
   saveData(DB);
+  // Await this product's upsert so a quick refresh doesn't pull stale data.
+  if (window.PXDynastySBC && window.PXDynastySBC.upsertProduct && editId) {
+    const saved = getProduct(editId);
+    if (saved) { try { await window.PXDynastySBC.upsertProduct(saved); } catch (e) { console.warn('product upsert failed', e); } }
+  }
   navigate('biz-products');
 }
 
@@ -5377,7 +5382,7 @@ document.addEventListener('change', async (e) => {
       img.style.margin = '0 auto';
       img.style.borderRadius = 'var(--radius-sm)';
       // Clear old placeholder content but keep the file input.
-      box.querySelectorAll('svg, div').forEach((n) => n.remove());
+      box.querySelectorAll('svg, div, img').forEach((n) => n.remove());
       box.insertBefore(img, box.querySelector('input'));
     }
   }
