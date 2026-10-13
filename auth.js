@@ -728,6 +728,25 @@ async function renderAuthGate() {
     return;
   }
 
+  // Guest mode: user arrived via a deep link (#business= / #product=).
+  // Render the app shell so they can browse, but keep them signed out.
+  const gs = authAppState();
+  if (gs && gs.guestMode) {
+    gs.role = 'customer';
+    gs.currentCustomerId = null;
+    appEl.classList.remove('auth-mode');
+    appEl.innerHTML = `
+      <div id="header-root"></div>
+      <div class="app-body">
+        <div id="sidebar-root"></div>
+        <main class="main-scroll" id="main-scroll"></main>
+      </div>
+      <div id="bottomnav-root"></div>
+    `;
+    if (typeof render === 'function') render();
+    return;
+  }
+
   appEl.classList.add('auth-mode');
   appEl.innerHTML = renderLandingPage();
   if (toastEl) toastEl.innerHTML = '';
@@ -849,4 +868,7 @@ window.PXDynastyAuth = {
   listStaff: authListStaffForCurrentBusiness,
   resetBusinessOwnerPassword: authResetBusinessOwnerPassword,
   resetAgentPassword: authResetAgentPassword,
+  login: authLogin,
+  signup: authSignup,
+  currentUserSync: authCurrentUserSync,
 };

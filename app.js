@@ -201,6 +201,7 @@ const state = {
   searchQuery: '',
   productFilters: { sort: 'popular', maxPrice: null, minRating: null },
   history: [],
+  guestMode: false,
 };
 
 function saveCart() { localStorage.setItem('PXDynasty_cart', JSON.stringify(state.cart)); }
@@ -282,6 +283,53 @@ function confirmDialog(title, body, confirmLabel, onConfirm, danger) {
     </div>
   `);
   document.getElementById('confirm-yes-btn').addEventListener('click', () => { closeModal(); onConfirm(); });
+}
+
+
+function openAuthGateModal() {
+  openModal(`
+    <div class="modal-head"><h3>Sign in to place your order</h3>
+      <button class="icon-btn" data-action="close-modal">${ICONS.x}</button>
+    </div>
+    <p class="text-muted" style="font-size:13.5px;margin-bottom:14px;">Your cart is saved. Create an account or sign in to complete your payment.</p>
+    <div class="form-group"><label>Name (for signup)</label><input type="text" id="ag-name" placeholder="Your full name" /></div>
+    <div class="form-group"><label>Email</label><input type="email" id="ag-email" placeholder="you@example.com" /></div>
+    <div class="form-group"><label>Password</label><input type="password" id="ag-password" placeholder="At least 6 characters" /></div>
+    <div id="ag-error" style="color:var(--color-error);font-size:13px;margin-bottom:10px;"></div>
+    <div class="flex gap-10">
+      <button class="btn btn-outline btn-block" id="ag-login-btn">Sign in</button>
+      <button class="btn btn-primary btn-block" id="ag-signup-btn">Create account</button>
+    </div>
+  `);
+  const err = (m) => { const e = document.getElementById('ag-error'); if (e) e.textContent = m || ''; };
+  const read = () => ({
+    name: (document.getElementById('ag-name') || {}).value || '',
+    email: (document.getElementById('ag-email') || {}).value || '',
+    password: (document.getElementById('ag-password') || {}).value || '',
+  });
+  document.getElementById('ag-login-btn').addEventListener('click', async () => {
+    const v = read();
+    if (!v.email || !v.password) return err('Email and password required');
+    err('Signing in...');
+    const res = await window.PXDynastyAuth.login(v.email, v.password);
+    if (!res.ok) return err(res.error || 'Sign in failed');
+    closeModal();
+    await window.PXDynastyAuth.applySessionToApp();
+    toast('Welcome back', 'success');
+    navigate('checkout');
+  });
+  document.getElementById('ag-signup-btn').addEventListener('click', async () => {
+    const v = read();
+    if (!v.name || !v.email || !v.password) return err('All fields required');
+    if (v.password.length < 6) return err('Password must be at least 6 characters');
+    err('Creating account...');
+    const res = await window.PXDynastyAuth.signup(v.email, v.password, v.name);
+    if (!res.ok) return err(res.error || 'Signup failed');
+    closeModal();
+    await window.PXDynastyAuth.applySessionToApp();
+    toast('Account created', 'success');
+    navigate('checkout');
+  });
 }
 
 /* ==========================================================================
@@ -5103,6 +5151,12 @@ async function placeOrderFlow() {
   const lines = cartLines();
   if (!lines.length) return;
 
+  // Guest gate: browsing is free, ordering is not.
+  if (!state.currentCustomerId) {
+    openAuthGateModal();
+    return;
+  }
+
   const cd = state.checkoutData;
   const totals = calculateOrderTotal(lines);
 
@@ -5346,6 +5400,9 @@ async function boot() {
     console.warn('hydrateDb failed:', e);
   }
 
+  const guestHash = (location.hash || '').match(/^#(business|product)=/);
+  if (guestHash) state.guestMode = true;
+
   if (window.PXDynastyAuth && typeof window.PXDynastyAuth.renderAuthGate === 'function') {
     await window.PXDynastyAuth.renderAuthGate();
   } else {
@@ -5361,7 +5418,8 @@ async function boot() {
       const [key, val] = hash.split('=');
       if (!val) return;
       const loggedIn = window.PXDynastyAuth && window.PXDynastyAuth.isLoggedIn && window.PXDynastyAuth.isLoggedIn();
-      if (!loggedIn) return; // auth flow will land them on the landing page; they can log in first
+      // Guests may browse business/product pages, but not order tracking.
+      if (!loggedIn && key === 'order') return;
       if (key === 'product') {
         const p = getProduct(val);
         if (p) { state.role = 'customer'; navigate('product', { id: p.id }); }
