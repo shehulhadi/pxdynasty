@@ -653,9 +653,9 @@ function renderHeader() {
       <div class="header-actions">
         ${actions}
         <div class="role-switcher">
-          <button class="role-pill" data-action="toggle-role-menu">
+          <button class="role-pill${state.isStaff ? ' role-pill-staff' : ''}" data-action="toggle-role-menu">
             <span class="avatar">${initials(roleSubtitle())}</span>
-            <span>${ROLE_LABEL[state.role]}</span>
+            <span>${state.isStaff ? 'Staff' : ROLE_LABEL[state.role]}</span>
           </button>
           <div class="role-menu" id="role-menu">
             <div class="role-menu-label">Signed in as ${escapeHtml(roleSubtitle())}</div>

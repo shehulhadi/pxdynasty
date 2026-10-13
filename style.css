@@ -1304,3 +1304,13 @@ textarea { resize: vertical; min-height: 80px; }
   .px-a2hs-sub { font-size: 11px; }
   .px-a2hs-cta { padding: 6px 10px; font-size: 12px; }
 }
+
+/* Staff role pill — visually distinct from owner */
+.role-pill-staff {
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+.role-pill-staff .avatar {
+  background: var(--color-text-muted);
+}
