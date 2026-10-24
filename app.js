@@ -147,6 +147,19 @@ function deliveryFeeForKm(km, settings) {
   return Math.max(floor, Math.round((km * rate) / 10) * 10);
 }
 
+// Best real product image for a category (first active product with a photo).
+function categoryImageOrEmoji(catId) {
+  try {
+    if (typeof DB !== 'undefined' && Array.isArray(DB.products)) {
+      const hit = DB.products.find((p) => p.category === catId && p.imageUrl && p.status !== 'hidden');
+      if (hit && hit.imageUrl) {
+        return `<img src="${escapeHtml(hit.imageUrl)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;" />`;
+      }
+    }
+  } catch (e) {}
+  return categoryEmoji(catId);
+}
+
 function defaultSettings() {
   return {
     commissionPercent: 5,
@@ -1081,7 +1094,7 @@ function customerHome() {
     <div class="category-scroll">
       ${CATEGORIES.map((c) => `
         <div class="category-chip pressable" data-action="pick-category" data-cat="${c.id}">
-          <div class="icon">${c.icon}</div>
+          <div class="icon">${categoryImageOrEmoji(c.id)}</div>
           <span>${c.name}</span>
         </div>`).join('')}
     </div>
@@ -1108,7 +1121,7 @@ function customerExplore() {
       </div>
       ${CATEGORIES.map((c) => `
         <div class="category-chip pressable ${cat === c.id ? 'active' : ''}" data-action="pick-category" data-cat="${c.id}">
-          <div class="icon">${c.icon}</div><span>${c.name}</span>
+          <div class="icon">${categoryImageOrEmoji(c.id)}</div><span>${c.name}</span>
         </div>`).join('')}
     </div>
     <div class="flex gap-8" style="margin:8px 0 16px;overflow-x:auto;">

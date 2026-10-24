@@ -610,7 +610,7 @@ function landingRenderCats() {
   if (!el || typeof CATEGORIES === 'undefined') return;
   el.innerHTML = CATEGORIES.slice(0, 8).map((c) =>
     `<button class="landing-cat" data-auth="guest-cat" data-cat="${c.id}">
-      <span class="landing-cat-icon">${categoryEmoji(c.id)}</span>
+      <span class="landing-cat-icon">${typeof categoryImageOrEmoji === "function" ? categoryImageOrEmoji(c.id) : categoryEmoji(c.id)}</span>
       <span class="landing-cat-label">${escapeHtml(c.name)}</span>
     </button>`
   ).join('');
